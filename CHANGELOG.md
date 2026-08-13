@@ -46,5 +46,6 @@ TLD-sync addon. Vendor identity was 2.5.1.
 - Vendor API documentation under `docs/vendor/`.
 - Composer dev tooling (PHPUnit, PHPStan, PHPCS).
 - Injectable `ApiClient` with mocked HTTP unit tests.
+- Tag-driven GitHub Release zip (`whmcs-connectreseller-VERSION.zip`) with SHA256.
 
 [3.0.0]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.0
