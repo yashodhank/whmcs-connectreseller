@@ -59,4 +59,28 @@ final class AddonDataTablesResponseTest extends TestCase
         self::assertFalse($decoded['status']);
         self::assertStringContainsString('API key', $decoded['message']);
     }
+
+    public function testAjaxErrorMessageDoesNotTreatEmbeddedHtmlAsApiFailure(): void
+    {
+        $js = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/assets/js/script.js'
+        );
+        self::assertStringNotContainsString(
+            'text.indexOf("<") !== -1',
+            $js
+        );
+        self::assertStringContainsString('Admin returned HTML instead of JSON', $js);
+    }
+
+    public function testAjaxHandlersEmitJsonOnException(): void
+    {
+        $src = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/Admin/Controller.php'
+        );
+        self::assertStringContainsString('private function emitJson($body)', $src);
+        self::assertStringContainsString('requireAdminToken(true, $draw)', $src);
+        self::assertStringContainsString('Sync TLDs failed:', $src);
+        self::assertStringContainsString('hash_equals($expected, $token)', $src);
+        self::assertStringContainsString("action=' . rawurlencode(\$action)", $src);
+    }
 }

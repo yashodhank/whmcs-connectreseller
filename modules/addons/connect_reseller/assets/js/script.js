@@ -60,8 +60,17 @@ $(document).ready(function () {
 
     function ajaxErrorMessage(xhr) {
         var text = (xhr && xhr.responseText) ? String(xhr.responseText) : "";
-        if (text.indexOf("<") !== -1) {
-            return "Server returned an unexpected response. Check API key and module logs.";
+        var trimmed = text.replace(/^\uFEFF/, "").replace(/^\s+/, "");
+        // Successful Sync payloads embed HTML form controls inside JSON strings.
+        // Only treat real HTML documents / PHP error pages as unexpected.
+        if (trimmed.charAt(0) === "{" || trimmed.charAt(0) === "[") {
+            var parsedJson = parseJsonSafe(trimmed);
+            if (parsedJson && parsedJson.message) {
+                return parsedJson.message;
+            }
+        }
+        if (/^</.test(trimmed) || /<\s*(!doctype|html|body|br|b|title|pre)\b/i.test(trimmed)) {
+            return "Admin returned HTML instead of JSON (session/CSRF/PHP error). Reload the page and check module logs.";
         }
         var parsed = parseJsonSafe(text);
         if (parsed && parsed.message) {
