@@ -5,6 +5,7 @@ parameters:
         - modules/registrars/connectreseller/lib/ApiClient.php
         - modules/registrars/connectreseller/lib/DomainMapper.php
         - modules/registrars/connectreseller/lib/Sensitive.php
+        - modules/registrars/connectreseller/lib/ContractSupport.php
         - tests
     excludePaths:
         - vendor

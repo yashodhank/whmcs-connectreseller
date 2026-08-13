@@ -5,6 +5,7 @@
     <file>modules/registrars/connectreseller/lib/ApiClient.php</file>
     <file>modules/registrars/connectreseller/lib/DomainMapper.php</file>
     <file>modules/registrars/connectreseller/lib/Sensitive.php</file>
+    <file>modules/registrars/connectreseller/lib/ContractSupport.php</file>
     <file>tests</file>
     <exclude-pattern>*/vendor/*</exclude-pattern>
     <rule ref="PSR1.Files.SideEffects.FoundWithSymbols">

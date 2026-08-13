@@ -7,10 +7,16 @@ if (!defined("WHMCS")) {
 use WHMCS\Module\Registrar\ConnectReseller\Helper;
 use WHMCS\Module\Registrar\ConnectReseller\Sensitive;
 use WHMCS\Module\Registrar\ConnectReseller\DomainMapper;
+use WHMCS\Module\Registrar\ConnectReseller\ApiClient;
+use WHMCS\Module\Registrar\ConnectReseller\ContractSupport;
 use WHMCS\Domains\DomainLookup\ResultsList;
 use WHMCS\Domains\DomainLookup\SearchResult;
 use WHMCS\Domain\TopLevel\ImportItem;
 use WHMCS\Database\Capsule;
+
+if (!defined('CONNECTRESELLER_MODULE_VERSION')) {
+    define('CONNECTRESELLER_MODULE_VERSION', '3.0.0');
+}
 
 $apiUrl = "https://api.connectreseller.com/ConnectReseller/";
 
@@ -18,18 +24,77 @@ function connectreseller_getConfigArray()
 {
     $configarray = array(
         'APIKey' => array('Type' => "text", 'Size' => "20", 'Description' => "Enter your API key"),
-        'BrandId' => array('Type' => "text", 'Size' => "20", 'Description' => " Enter your BrandId  "),
+        'BrandId' => array(
+            'Type' => "text",
+            'Size' => "20",
+            'Description' => "Reseller ID used for Test Connection (V11 availablefund). Most ESHOP calls authenticate with API Key only.",
+        ),
         'CouponCode' => array('Type' => "text", 'Size' => "20", 'Description' => " Enter your Coupon code  "),
+        'ModuleVersion' => array(
+            'FriendlyName' => 'Module Version',
+            'Type' => 'System',
+            'Description' => CONNECTRESELLER_MODULE_VERSION,
+        ),
     );
     return $configarray;
 }
 function connectreseller_MetaData()
 {
     return array(
-        'DisplayName' => 'connectreseller',
-        'APIVersion' => '2.5.1',
-        'NonLinearRegistrationPricing' => TRUE,
+        'DisplayName' => 'ConnectReseller',
+        'APIVersion' => '1.1',
+        'NonLinearRegistrationPricing' => true,
     );
+}
+
+/**
+ * @param array<string, mixed> $params
+ * @return array<string, mixed>
+ */
+function connectreseller_TestConnection($params)
+{
+    try {
+        $client = new ApiClient();
+        $query = array('APIKey' => $params['APIKey']);
+        if (!empty($params['BrandId'])) {
+            $query['resellerId'] = $params['BrandId'];
+        }
+        $response = $client->get('availablefund', $query, 'TestConnection');
+
+        return ContractSupport::interpretFundsResponse($response['result']);
+    } catch (\Throwable $e) {
+        return array(
+            'error' => $e->getMessage(),
+        );
+    }
+}
+
+/**
+ * @param array<string, mixed> $params
+ * @return mixed
+ */
+function connectreseller_GetDomainInformation($params)
+{
+    try {
+        $helper = new Helper();
+        $domainname = DomainMapper::websiteName($params['sld'], $params['tld']);
+        $viewDomainurl = 'ViewDomain?APIKey=' . $params['APIKey'] . '&websiteName=' . $domainname;
+        $response = $helper->get($viewDomainurl, array(), 'GetDomainInformation');
+        if ($response['result']['responseMsg']['statusCode'] != 200) {
+            return $helper->sendResponse($response['result']);
+        }
+        $info = ContractSupport::domainInformationFromView(
+            $response['result']['responseData'],
+            $params['sld'],
+            $params['tld']
+        );
+
+        return ContractSupport::toWhmcsDomain($info);
+    } catch (\Throwable $e) {
+        return array(
+            'error' => $e->getMessage(),
+        );
+    }
 }
 function connectreseller_GetNameservers($params)
 {
