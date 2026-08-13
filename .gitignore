@@ -9,6 +9,7 @@
 !.env.example
 *.zip
 graphify-out/
+dist/
 .idea/
 .vscode/
 *.swp
