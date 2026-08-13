@@ -25,6 +25,10 @@ if (!empty($whmcspath)) {
 }
 use WHMCS\Database\Capsule;
 
+if (function_exists('connectreseller_ensureKycSchema')) {
+    connectreseller_ensureKycSchema();
+}
+
 // Send KYC verification Email
 try {
     logActivity("KYC Verification Email Cron started on " . date('Y-m-d H:i:s'));

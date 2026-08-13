@@ -17,6 +17,16 @@ TLD-sync addon. Vendor identity was 2.5.1.
 - License is MIT, with attribution to ConnectReseller for the original 2.5.1 code.
 - PHP language ceiling in shipped code is 7.4; CI covers 7.4, 8.1, 8.2, and 8.3.
 
+### Security
+
+- API keys and passwords are redacted from `logModuleCall` output.
+- Reseller AddClient passwords are random (`random_bytes`) and are not logged.
+- KYC AJAX requires an authenticated admin session and WHMCS CSRF token.
+- HTML from order info and KYC status is escaped.
+- KYC schema is created on first use, not when `hooks.php` is included.
+- cURL verifies TLS (`CURLOPT_SSL_VERIFYPEER` / `VERIFYHOST`).
+- Hook API URLs are built with `http_build_query`.
+
 ### Fixed
 
 - GetEPPCode IDN lookup used an undefined `$domainname`.

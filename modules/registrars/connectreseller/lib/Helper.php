@@ -18,8 +18,7 @@ class Helper
     public function __curlCall($method, $data = null, $apiEndUrl = null, $action = '')
     {
         $url = $this->baseUrl . $apiEndUrl;
-
-        
+        $url = Sensitive::normalizeUrl($url);
 
         $curl = curl_init();
 
@@ -44,6 +43,8 @@ class Helper
 
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
 
         
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10); // This matches with your example
@@ -64,13 +65,18 @@ class Helper
 
         curl_close($curl);
 
-        // Decode the JSON response into an associative array
         $arrayResponse = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Invalid JSON from ConnectReseller: ' . json_last_error_msg());
+        }
 
-       
-
-        // Log the response for debugging purposes
-        logModuleCall("Connect Reseller", $action, (empty($data) ? ['url' => $url] : $data), $arrayResponse);
+        $logRequest = (empty($data) ? array('url' => $url) : $data);
+        logModuleCall(
+            "Connect Reseller",
+            $action,
+            Sensitive::redact($logRequest),
+            Sensitive::redact($arrayResponse)
+        );
 
         // Return the array result
         return ['result' => $arrayResponse];
@@ -176,19 +182,21 @@ class Helper
             $html .= '</tr>';
             $html .= '<tr align="left">';
             $html .= '<td>Domain Name</td>';
-            $html .= '<td>' . $response['result']['responseData']['websiteName'] . '</td>';
+            $html .= '<td>' . Sensitive::escapeHtml($response['result']['responseData']['websiteName']) . '</td>';
             $html .= '</tr>';
             $html .= '<tr align="left">';
             $html .= '<td>Domain Status</td>';
-            $html .= '<td>' . (($response['result']['responseData']['status'] == "Locked") ? "Inactive" : $response['result']['responseData']['status']) . '</td>';
+            $statusLabel = (($response['result']['responseData']['status'] == "Locked") ? "Inactive" : $response['result']['responseData']['status']);
+            $html .= '<td>' . Sensitive::escapeHtml($statusLabel) . '</td>';
             $html .= '</tr>';
             $html .= '<tr align="left">';
             $html .= '<td>Domain Lock Status</td>';
-            $html .= '<td>' . (($response['result']['responseData']['isDomainLocked'] == "true") ? "Locked" : "Unlock") . '</td>';
+            $lockLabel = (($response['result']['responseData']['isDomainLocked'] == "true") ? "Locked" : "Unlock");
+            $html .= '<td>' . Sensitive::escapeHtml($lockLabel) . '</td>';
             $html .= '</tr>';
             $html .= '<tr align="left">';
             $html .= '<td>Expiration Date</td>';
-            $html .= '<td>' . $expirationDate . '</td>';
+            $html .= '<td>' . Sensitive::escapeHtml($expirationDate) . '</td>';
             $html .= '</tr>';
             $html .= '</tbody>';
             $html .= '</table>';
