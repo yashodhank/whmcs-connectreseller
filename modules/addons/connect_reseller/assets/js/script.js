@@ -1,15 +1,81 @@
 $(document).ready(function () {
+    var addonCfg = window.ConnectResellerAddon || {};
+    var moduleUrl = addonCfg.moduleLink || window.location.href.split("#")[0];
+    var csrfToken = addonCfg.token || "";
 
-    $(".domain-table").show();
-    $('.alldomain-box').append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
-    dataTableFun('Get Domain Sync');
-    $('.alldomain-box').find("i.fa-spinner").remove();
-    const secureCall = (data = {}, method = "GET", url = '') => {
+    function withCsrf(data) {
+        data = data || {};
+        if (csrfToken) {
+            data.token = csrfToken;
+        }
+        return data;
+    }
+
+    function hideProcessing($table) {
+        var $wrap = $table.closest(".dataTables_wrapper");
+        $wrap.find("div.dataTables_processing").hide();
+        try {
+            var api = $table.DataTable();
+            if (api && typeof api.processing === "function") {
+                api.processing(false);
+            }
+        } catch (e) {
+            // table may not be initialised yet
+        }
+    }
+
+    function growlError(message) {
+        if (jQuery.growl && jQuery.growl.error) {
+            jQuery.growl.error({
+                title: "Error",
+                message: message || "Request failed",
+                duration: 4000
+            });
+        }
+    }
+
+    function growlNotice(message) {
+        if (jQuery.growl && jQuery.growl.notice) {
+            jQuery.growl.notice({
+                title: "Success",
+                message: message || "Done",
+                duration: 3000
+            });
+        }
+    }
+
+    function parseJsonSafe(response) {
+        if (response && typeof response === "object") {
+            return response;
+        }
+        if (typeof response !== "string" || response === "") {
+            return null;
+        }
+        try {
+            return JSON.parse(response);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function ajaxErrorMessage(xhr) {
+        var text = (xhr && xhr.responseText) ? String(xhr.responseText) : "";
+        if (text.indexOf("<") !== -1) {
+            return "Server returned an unexpected response. Check API key and module logs.";
+        }
+        var parsed = parseJsonSafe(text);
+        if (parsed && parsed.message) {
+            return parsed.message;
+        }
+        return text || "Request failed";
+    }
+
+    var secureCall = function (data, method, url) {
         return new Promise(function (resolve, reject) {
             $.ajax({
-                url: url,
-                method: method,
-                data: data,
+                url: url || moduleUrl,
+                method: method || "GET",
+                data: withCsrf(data),
                 success: function (response) {
                     resolve(response);
                 },
@@ -18,228 +84,116 @@ $(document).ready(function () {
                 }
             });
         });
+    };
+
+    var hasDomainTable = $("#domainTable").length > 0;
+    var hasTldTable = $("#tldTable").length > 0;
+    var domainTableApi = null;
+    var tldTableApi = null;
+
+    function selectedTldCount() {
+        return $("input[name='checkbox[]']:checked").length;
     }
 
-    $(document).on('change', "input[name='checkbox[]'] ,#selectAll ", function () {
-        var checkedCount = $("input[name='checkbox[]']:checked").length;
-        $('.create-domain').text('Import TLDs ' + checkedCount);
-    });
-
-    // $(document).on("click", ".create-domain", async function () {
-    //     try {
-    //         $this = $(this);
-    //         $this.prop('disabled', true);
-    //         $this.append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
-    //         var formData = '';
-    //         var formData = $('.all-ssl-domain').serialize();
-
-    //         $("#progressBar-container").show();
-    //         $("#progressBar").css("width", "30%");
-    //         $("#showProcessBarValue").html('30%');
-
-    //         setTimeout(() => {$("#progressBar").css("width", "60%")
-    //             $("#showProcessBarValue").html('60%');
-    //         }, 500);
-            
-
-    //         let response = await secureCall({
-    //             "ajaxcall": true,
-    //             "ajaxaction": "Create Domain",
-    //             'data': formData
-    //         }, 'POST');
-
-    //         setTimeout(() => {$("#progressBar").css("width", "60%")
-    //             $("#showProcessBarValue").html('60%');
-    //         }, 500);
-
-    //         $("#progressBar").css("width", "90%");
-    //         $("#showProcessBarValue").html('90%');
-
-    //         $this.find("i.fa-spinner").remove();
-    //         const parsedResponse = JSON.parse(response);
-
-    //         if (parsedResponse.status === true) {
-    //             jQuery.growl.notice({ title: "Success", message: parsedResponse.message, duration: 3000 });
-    //             domainsync();
-    //         } else {
-    //             jQuery.growl.error({ title: "Error", message: parsedResponse.message, duration: 3000 });
-    //         }
-    //         $("#progress-bar").css("width", "100%");
-    //         setTimeout(() => {
-    //             $("#progressBar-container").fadeOut(400, function () {
-    //                 $("#progressBar").css("width", "0%");
-    //                 $("#showProcessBarValue").html('0%');
-    //             });
-    //         }, 700);
-    //         $this.prop('disabled', false);
-    //     } catch (error) {
-    //         console.error(error);
-    //     }
-    // });
-
-    // $(document).on("click", ".domain_sync", function () {
-    //     try {
-    //         $(".domain-table").show();
-    //         $('.alldomain-box').append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
-
-    //         dataTableFun('Get Domain Sync');
-    //         $('.alldomain-box').find("i.fa-spinner").remove();
-    //     } catch (error) {
-    //         console.error(error)
-    //     }
-    // });
-
-
-    $(document).on("click", ".create-domain", async function () {
-        try {
-            let $this = $(this);
-            $this.prop('disabled', true);
-            $this.append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
-     
-            // Show progress bar
-            $(".progress-bar-container").show();
-            updateProgress(10); // Start at 10%
-     
-            var formData = $('.all-ssl-domain').serialize();
-            
-            console.log(formData);
-            // Simulate progress in steps while waiting for response
-            updateProgress(30);
-            setTimeout(() => updateProgress(50), 300);
-            setTimeout(() => updateProgress(70), 600);
-     
-            let response = await secureCall({
-                "ajaxcall": true,
-                "ajaxaction": "Create Domain",
-                'data': formData
-            }, 'POST');
-     
-            updateProgress(90);
-     
-            $this.find("i.fa-spinner").remove();
-            const parsedResponse = JSON.parse(response);
-     
-            if (parsedResponse.status === true) {
-                jQuery.growl.notice({ title: "Success", message: parsedResponse.message, duration: 3000 });
-                $(".domain_sync").click();
+    function updateImportButtonState() {
+        var count = selectedTldCount();
+        var $btn = $(".create-domain");
+        var label = count > 0 ? ("Import TLDs " + count) : "Import TLDs";
+        $btn.each(function () {
+            var $el = $(this);
+            var $spin = $el.find("i.fa-spinner");
+            $el.contents().filter(function () {
+                return this.nodeType === 3;
+            }).remove();
+            if ($spin.length) {
+                $el.prepend(document.createTextNode(label + " "));
             } else {
-                jQuery.growl.error({ title: "Error", message: parsedResponse.message, duration: 3000 });
+                $el.text(label);
             }
-     
-            // Finish at 100%
-            updateProgress(100);
-     
-            // Hide after short delay
-            setTimeout(() => {
-                $(".progress-bar-container").fadeOut(400, function () {
-                    updateProgress(0);
-                });
-            }, 800);
-     
-            $this.prop('disabled', false);
-        } catch (error) {
-            console.error(error);
-            $(".progress-bar-container").fadeOut(400, function () {
-                updateProgress(0);
-            });
-        }
-    });
-     
-    // Helper to update progress bar and percent label
-    function updateProgress(percent) {
-        $(".progress-bar").css("width", percent + "%");
-        $(".progress-percent").text(percent + "%");
+            if (!$el.data("busy")) {
+                $el.prop("disabled", count === 0);
+            }
+        });
     }
 
-    function domainsync() {
-        try {
-            $(".domain-table").show();
-            $('.alldomain-box').append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
-
-            dataTableFun('Get Domain Sync');
-            $('.alldomain-box').find("i.fa-spinner").remove();
-            $('.create-domain').text('Import TLDs');
-        } catch (error) {
-            console.error(error)
+    function setImportBusy($btn, busy) {
+        $btn.data("busy", busy ? 1 : 0);
+        if (busy) {
+            $btn.prop("disabled", true);
+            if (!$btn.find("i.fa-spinner").length) {
+                $btn.append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
+            }
+        } else {
+            $btn.find("i.fa-spinner").remove();
+            updateImportButtonState();
         }
     }
 
-
-    $(document).on("click", ".manual_sync", async function () {
-        try {
-            $this = $(this);
-            $this.prop('disabled', true);
-            $this.append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
-            let response = await secureCall({ "ajaxcall": true, "ajaxaction": "manual Sync TLDs", }, 'POST');
-            const parsedResponse = JSON.parse(response);
-            if (parsedResponse.status === true) {
-                jQuery.growl.notice({ title: "Success", message: parsedResponse.message, duration: 3000 });
-                $this.find("i.fa-spinner").remove();
-            } else {
-                jQuery.growl.error({ title: "Error", message: parsedResponse.message, duration: 3000 });
-            }
-            $this.prop('disabled', false);
-        } catch (error) {
-            console.error(error)
+    function reloadDomainTable() {
+        if (domainTableApi) {
+            domainTableApi.ajax.reload(null, false);
+            return;
         }
-    });
+        if (hasDomainTable) {
+            dataTableFun("Get Domain Sync");
+        }
+    }
 
-    $(document).on("click", "#selectAll", function (e) {
-        var isChecked = $(this).prop('checked');
-        $("input[name='checkbox[]']").prop('checked', isChecked);
-    });
+    function dataTableFun(ajaxCallFor) {
+        if (!hasDomainTable) {
+            return;
+        }
 
-    $(window).on("load", function () {
-        // dataTableFun('default');
-        enableDisableDatatable('Enable/Disable TLD List');
-    });
+        if ($.fn.DataTable.isDataTable("#domainTable")) {
+            $("#domainTable").DataTable().clear().destroy();
+        }
 
-    function dataTableFun(ajaxCallFor = '') {
-        $("#domainTable").dataTable().fnDestroy();
-        $('#domainTable').DataTable({
+        domainTableApi = $("#domainTable").DataTable({
             processing: true,
             searching: true,
-            order: [[0, "desc"]],
+            order: [[2, "asc"]],
             serverSide: true,
-            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             pageLength: 100,
             ajax: {
-                url: '', // Your API endpoint
-                type: 'POST',
+                url: moduleUrl,
+                type: "POST",
                 data: function (d) {
-
                     d.ajaxcall = true;
                     d.ajaxaction = ajaxCallFor;
-                    // Add pagination parameters
                     d.start = d.start || 0;
                     d.length = d.length || 10;
+                    if (csrfToken) {
+                        d.token = csrfToken;
+                    }
                 },
                 dataSrc: function (json) {
-
-                    if (json.status === false) {
-                        jQuery.growl.error({
-                            title: "Error",
-                            message: json.message || "An unknown error occurred",
-                            duration: 3000
-                        });
+                    if (!json || typeof json !== "object") {
+                        hideProcessing($("#domainTable"));
+                        growlError("Invalid response from Sync TLDs.");
+                        return [];
                     }
-
+                    if (json.status === false) {
+                        hideProcessing($("#domainTable"));
+                        growlError(json.message || "An unknown error occurred");
+                    }
                     return json.data || [];
                 },
-                error: function (xhr, error, thrown) {
-                    console.error("AJAX error:", xhr.responseText);  // Log the error message
+                error: function (xhr) {
+                    hideProcessing($("#domainTable"));
+                    growlError(ajaxErrorMessage(xhr));
                 }
             },
             columns: [
-                { data: 'checkbox', orderable: false },
-                { data: 'existtld' },
-                { data: 'tld' },
-                { data: 'registration_price' },
-                { data: 'renewal_price' },
-                { data: 'transfer_price' },
-                { data: 'currency_code' },
-                { data: 'min_period' },
-                { data: 'max_period' }
+                { data: "checkbox", orderable: false },
+                { data: "existtld" },
+                { data: "tld" },
+                { data: "registration_price" },
+                { data: "renewal_price" },
+                { data: "transfer_price" },
+                { data: "currency_code" },
+                { data: "min_period" },
+                { data: "max_period" }
             ],
             columnDefs: [
                 {
@@ -250,39 +204,70 @@ $(document).ready(function () {
             ],
             language: {
                 infoFiltered: "",
-                emptyTable: "No data available in table"
+                emptyTable: "No TLDs returned from the API",
+                zeroRecords: "No matching TLDs",
+                processing: "Loading TLDs…"
+            },
+            drawCallback: function () {
+                updateImportButtonState();
             }
         });
     }
 
-    function enableDisableDatatable(ajaxCallFor = '') {
-        $('#tldTable').DataTable({
+    function enableDisableDatatable(ajaxCallFor) {
+        if (!hasTldTable) {
+            return;
+        }
+
+        if ($.fn.DataTable.isDataTable("#tldTable")) {
+            $("#tldTable").DataTable().clear().destroy();
+        }
+
+        tldTableApi = $("#tldTable").DataTable({
             processing: true,
             searching: true,
-            order: [[0, "desc"]],
+            order: [[0, "asc"]],
             serverSide: true,
             pageLength: 25,
-            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             ajax: {
-                url: '', // Your API endpoint
-                type: 'POST',
+                url: moduleUrl,
+                type: "POST",
                 data: function (d) {
                     d.ajaxcall = true;
                     d.ajaxaction = ajaxCallFor;
                     d.start = d.start || 0;
                     d.length = d.length === -1 ? 100000 : d.length;
+                    if (csrfToken) {
+                        d.token = csrfToken;
+                    }
                 },
                 dataSrc: function (json) {
+                    if (!json || typeof json !== "object") {
+                        hideProcessing($("#tldTable"));
+                        growlError("Invalid response from Automation.");
+                        return [];
+                    }
+                    if (json.status === false) {
+                        hideProcessing($("#tldTable"));
+                        growlError(json.message || "An unknown error occurred");
+                    } else if (json.message && (!json.data || !json.data.length)) {
+                        // empty-state guidance from server (import first)
+                        var $note = $(".automation-empty-note");
+                        if ($note.length) {
+                            $note.removeClass("hidden").show();
+                        }
+                    }
                     return json.data || [];
                 },
-                error: function (xhr, error, thrown) {
-                    console.error("AJAX error:", xhr.responseText);  // Log the error message
+                error: function (xhr) {
+                    hideProcessing($("#tldTable"));
+                    growlError(ajaxErrorMessage(xhr));
                 }
             },
             columns: [
-                // { data: 'domain_id' },
-                { data: 'extension' },
-                { data: 'status' },
+                { data: "extension" },
+                { data: "status" }
             ],
             columnDefs: [
                 {
@@ -293,48 +278,172 @@ $(document).ready(function () {
             ],
             language: {
                 infoFiltered: "",
-                emptyTable: "No data available in table"
+                emptyTable: "No TLDs yet — import them on the Sync TLDs tab first",
+                zeroRecords: "No matching TLDs",
+                processing: "Loading…"
+            },
+            initComplete: function () {
+                var $bulk = $(".tld-bulk-toggle");
+                if ($bulk.length) {
+                    var $length = $("#tldTable_wrapper .dataTables_length");
+                    if ($length.length && !$bulk.data("moved")) {
+                        $bulk.insertAfter($length).addClass("tld-bulk-toggle--toolbar").data("moved", 1);
+                    }
+                }
             }
         });
     }
 
-    $(document).on("click", ".toggle-checkbox", async function () {
+    if (hasDomainTable) {
+        $(".domain-table").show();
+        dataTableFun("Get Domain Sync");
+        updateImportButtonState();
+    }
+
+    if (hasTldTable) {
+        enableDisableDatatable("Enable/Disable TLD List");
+    }
+
+    $(document).on("change", "input[name='checkbox[]'], #selectAll", function () {
+        updateImportButtonState();
+    });
+
+    $(document).on("click", ".create-domain", async function () {
+        var $this = $(this);
+        if ($this.data("busy") || selectedTldCount() === 0) {
+            return;
+        }
+
         try {
-            $this = $(this);
-            $this.prop('disabled', true);
+            setImportBusy($this, true);
+            $(".progress-bar-container").show();
+            updateProgress(10);
 
-            var tld_id = $this.attr('tld_id');
+            var formData = $(".all-ssl-domain").serialize();
+            updateProgress(30);
+            setTimeout(function () {
+                updateProgress(50);
+            }, 300);
+            setTimeout(function () {
+                updateProgress(70);
+            }, 600);
 
-            const NEWSTATUS = $this.data('status') == 'on' ? 'off' : 'on';
-            $this.after('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
-            let result = await secureCall({ "ajaxcall": true, "ajaxaction": "Enable/Disable TLD", 'tld': tld_id, 'status': NEWSTATUS }, 'POST');
+            var response = await secureCall({
+                ajaxcall: true,
+                ajaxaction: "Create Domain",
+                data: formData
+            }, "POST");
 
-            $this.next("i.fa-spinner").remove();
-            var parsedResponse = JSON.parse(result);
+            updateProgress(90);
 
-            if (parsedResponse.status === true) {
-                jQuery.growl.notice({ title: "Success", message: parsedResponse.message, duration: 3000 });
+            var parsedResponse = parseJsonSafe(response);
+            if (!parsedResponse) {
+                growlError("Import returned a non-JSON response.");
+            } else if (parsedResponse.status === true) {
+                growlNotice(parsedResponse.message);
+                $("input[name='checkbox[]'], #selectAll").prop("checked", false);
+                reloadDomainTable();
             } else {
-                jQuery.growl.error({ title: "Error", message: parsedResponse.message, duration: 3000 });
+                growlError(parsedResponse.message || "Import failed");
             }
 
-            $this.prop('disabled', false);
+            updateProgress(100);
+            setTimeout(function () {
+                $(".progress-bar-container").fadeOut(400, function () {
+                    updateProgress(0);
+                });
+            }, 800);
         } catch (error) {
-            console.error(error)
+            console.error(error);
+            growlError(ajaxErrorMessage(error));
+            $(".progress-bar-container").fadeOut(400, function () {
+                updateProgress(0);
+            });
+        } finally {
+            setImportBusy($this, false);
         }
     });
 
-    $(document).on("click", ".toggle-checkboxs", async function () {
+    function updateProgress(percent) {
+        $(".progress-bar").css("width", percent + "%");
+        $(".progress-percent").text(percent + "%");
+    }
 
-        if($(this).prop('checked') == true){
-            $('#enabletld').submit();
-        }else{
-            $('#disabletld').submit();
+    $(document).on("click", ".manual_sync", async function () {
+        var $this = $(this);
+        try {
+            $this.prop("disabled", true);
+            $this.append('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
+            var response = await secureCall({
+                ajaxcall: true,
+                ajaxaction: "manual Sync TLDs"
+            }, "POST");
+            var parsedResponse = parseJsonSafe(response);
+            if (!parsedResponse) {
+                growlError("Manual sync returned a non-JSON response.");
+            } else if (parsedResponse.status === true) {
+                growlNotice(parsedResponse.message);
+            } else {
+                growlError(parsedResponse.message || "Sync failed");
+            }
+        } catch (error) {
+            console.error(error);
+            growlError(ajaxErrorMessage(error));
+        } finally {
+            $this.find("i.fa-spinner").remove();
+            $this.prop("disabled", false);
         }
     });
 
-    $(document).ready(function () {
-        $('[data-bs-toggle="tooltip"]').tooltip();
+    $(document).on("click", "#selectAll", function () {
+        var isChecked = $(this).prop("checked");
+        $("input[name='checkbox[]']").prop("checked", isChecked);
+        updateImportButtonState();
     });
 
+    $(document).on("click", ".toggle-checkbox", async function () {
+        var $this = $(this);
+        try {
+            $this.prop("disabled", true);
+            var tldId = $this.attr("tld_id");
+            var newStatus = $this.data("status") == "on" ? "off" : "on";
+            $this.after('<i class="fa fa-spinner fa-spin ml-2" aria-hidden="true"></i>');
+
+            var result = await secureCall({
+                ajaxcall: true,
+                ajaxaction: "Enable/Disable TLD",
+                tld: tldId,
+                status: newStatus
+            }, "POST");
+
+            $this.next("i.fa-spinner").remove();
+            var parsedResponse = parseJsonSafe(result);
+            if (!parsedResponse) {
+                growlError("Toggle returned a non-JSON response.");
+            } else if (parsedResponse.status === true) {
+                $this.data("status", newStatus);
+                growlNotice(parsedResponse.message);
+            } else {
+                growlError(parsedResponse.message || "Update failed");
+                $this.prop("checked", newStatus !== "on");
+            }
+        } catch (error) {
+            console.error(error);
+            growlError(ajaxErrorMessage(error));
+        } finally {
+            $this.prop("disabled", false);
+        }
+    });
+
+    $(document).on("click", ".toggle-checkboxs", function () {
+        if ($(this).prop("checked") === true) {
+            $("#enabletld").submit();
+        } else {
+            $("#disabletld").submit();
+        }
+    });
+
+    if ($("[data-bs-toggle='tooltip']").length) {
+        $("[data-bs-toggle='tooltip']").tooltip();
+    }
 });

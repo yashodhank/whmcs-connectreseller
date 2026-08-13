@@ -33,7 +33,37 @@ class Controller
         $this->tplVar['header'] = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/header.tpl";
         $this->tplVar['cssPath'] = $CONFIG["SystemURL"] . "/modules/addons/{$params['module']}/assets/css/";
         $this->tplVar['scriptPath'] = $CONFIG["SystemURL"] . "/modules/addons/{$params['module']}/assets/js/";
+        $this->tplVar['csrfToken'] = function_exists('generate_token')
+            ? generate_token('plain')
+            : '';
     }
+
+    /**
+     * Verify admin CSRF when WHMCS token helpers are available.
+     */
+    private function requireAdminToken()
+    {
+        if (function_exists('check_token')) {
+            check_token('WHMCS.admin.default');
+        }
+    }
+
+    /**
+     * @return int
+     */
+    private function requestDraw()
+    {
+        global $whmcs;
+        $draw = 1;
+        if (isset($_POST['draw'])) {
+            $draw = (int) $_POST['draw'];
+        } elseif ($whmcs && method_exists($whmcs, 'get_req_var')) {
+            $draw = (int) $whmcs->get_req_var('draw');
+        }
+
+        return $draw > 0 ? $draw : 1;
+    }
+
     public function enabledisable($vars)
     {
         try {
@@ -46,27 +76,29 @@ class Controller
             if (!empty($whmcs->get_req_var("formaction"))) {
                 $formaction = $whmcs->get_req_var("formaction");
                 if ($formaction == 'checkall') {
+                    $this->requireAdminToken();
                     Capsule::table('mod_domain_status')->update(['status' => 'on']);
                     $formSubmitMessage = ['status' => 'success', 'message' => $lang['TLDsStatusEnabled']];
                 }
                 if ($formaction == 'uncheckall') {
+                    $this->requireAdminToken();
                     Capsule::table('mod_domain_status')->update(['status' => 'off']);
                     $formSubmitMessage = ['status' => 'success', 'message' => $lang['TLDsStatusDisabled']];
                 }
                 if ($formaction == 'runPriceSyncNow') {
-                    if (function_exists('check_token')) {
-                        check_token('WHMCS.admin.default');
-                    }
+                    $this->requireAdminToken();
                     $result = PriceSyncTask::run();
+                    $resultText = (string) $result;
+                    $isError = (stripos($resultText, 'error') !== false
+                        || stripos($resultText, 'APIKey empty') !== false
+                        || stripos($resultText, 'unavailable') !== false);
                     $formSubmitMessage = [
-                        'status' => 'success',
-                        'message' => 'Price sync result: ' . $result,
+                        'status' => $isError ? 'error' : 'success',
+                        'message' => 'Price sync result: ' . $resultText,
                     ];
                 }
                 if ($formaction == 'runKycNow') {
-                    if (function_exists('check_token')) {
-                        check_token('WHMCS.admin.default');
-                    }
+                    $this->requireAdminToken();
                     if (!class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\KycCron')) {
                         $cronFile = dirname(__DIR__, 3) . '/registrars/connectreseller/lib/KycCron.php';
                         if (is_readable($cronFile)) {
@@ -78,13 +110,17 @@ class Controller
                     }
                     if (class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\KycCron')) {
                         $result = \WHMCS\Module\Registrar\ConnectReseller\KycCron::run();
+                        $resultText = (string) $result;
+                        $isError = (stripos($resultText, 'error') !== false
+                            || stripos($resultText, 'APIKey empty') !== false
+                            || stripos($resultText, 'unavailable') !== false);
                         $formSubmitMessage = [
-                            'status' => 'success',
-                            'message' => 'KYC cron result: ' . $result,
+                            'status' => $isError ? 'error' : 'success',
+                            'message' => 'KYC cron result: ' . $resultText,
                         ];
                     } else {
                         $formSubmitMessage = [
-                            'status' => 'success',
+                            'status' => 'error',
                             'message' => 'KYC cron unavailable (registrar module missing)',
                         ];
                     }
@@ -92,13 +128,14 @@ class Controller
             }
 
             if (($whmcs->get_req_var("ajaxaction") == "Enable/Disable TLD List") && ($whmcs->get_req_var("ajaxcall") == "true")) {
-
+                $this->requireAdminToken();
                 $data = $helper->tldsList($_POST);
                 echo $data;
                 exit;
             }
 
             if (($whmcs->get_req_var("ajaxaction") == "Enable/Disable TLD") && ($whmcs->get_req_var("ajaxcall") == "true")) {
+                $this->requireAdminToken();
 
                 if (empty($whmcs->get_req_var("tld"))) {
                     $message = ["status" => false, "message" => 'Something Went Wrong'];
@@ -121,20 +158,23 @@ class Controller
             }
 
             if (($whmcs->get_req_var("ajaxaction") == "manual Sync TLDs") && ($whmcs->get_req_var("ajaxcall") == "true")) {
+                $this->requireAdminToken();
 
                 $allDomainList = $helper->fetch_table_record("tbldomainpricing", [], "");
                 $params = $helper->CredentialRegistrar();
+                if (empty($params['APIKey'])) {
+                    $helper->sendResponse(false, 'Registrar API key is not configured.');
+                }
+
                 $allApiTld = $helper->get("tldsync?APIKey=" . $params['APIKey'], [], "Get Domain List");
 
-                if ($allApiTld['result']->statusCode) {
-                    $helper->sendResponse(false, $allApiTld['result']->responseText);
+                if ($helper->isTldSyncError($allApiTld['result'])) {
+                    $helper->sendResponse(false, $helper->tldSyncErrorMessage($allApiTld['result']));
                 }
 
                 $byTld = array();
-                foreach ($allApiTld['result'] as $products) {
-                    if (isset($products->tld)) {
-                        $byTld[$products->tld] = $products;
-                    }
+                foreach ($helper->normalizeTldSyncList($allApiTld['result']) as $products) {
+                    $byTld[$products->tld] = $products;
                 }
 
                 foreach ($allDomainList as $tld) {
@@ -170,10 +210,13 @@ class Controller
                 $checkboxStatus ='true';
             }
 
+            $tldRowCount = Capsule::table('mod_domain_status')->count();
+
             $this->tplFileName = $this->tplVar['tab'] = __FUNCTION__;
             $this->tplVar['formSubmitMessage'] = $formSubmitMessage;
             $this->tplVar['checkboxStatus'] = $checkboxStatus;
             $this->tplVar['cronStatus'] = $this->buildCronStatus();
+            $this->tplVar['showAutomationEmpty'] = ($tldRowCount === 0);
             $this->output();
         } catch (\Exception $e) {
             $this->tplVar['error'] = $e->getMessage();
@@ -242,40 +285,43 @@ class Controller
             $params = $helper->CredentialRegistrar();
 
             if (($whmcs->get_req_var("ajaxaction") == "Get Domain Sync") && ($whmcs->get_req_var("ajaxcall") == "true")) {
-                $allDomainList = $helper->get("tldsync?APIKey=" . $params['APIKey'], [], "Get Domain List");
+                $this->requireAdminToken();
+                $draw = $this->requestDraw();
 
-                if ($allDomainList['result']->statusCode) {
-                    $helper->sendResponse(false, $allDomainList['result']->responseText);
+                if (empty($params['APIKey'])) {
+                    echo $helper->dataTablesPayload(
+                        $draw,
+                        array(),
+                        false,
+                        'Registrar API key is not configured.',
+                        0,
+                        0
+                    );
+                    exit;
                 }
 
-                $data = $helper->domainTable($allDomainList['result'], $_POST);
+                $allDomainList = $helper->get("tldsync?APIKey=" . $params['APIKey'], [], "Get Domain List");
+
+                if ($helper->isTldSyncError($allDomainList['result'])) {
+                    echo $helper->dataTablesPayload(
+                        $draw,
+                        array(),
+                        false,
+                        $helper->tldSyncErrorMessage($allDomainList['result']),
+                        0,
+                        0
+                    );
+                    exit;
+                }
+
+                $tldRows = $helper->normalizeTldSyncList($allDomainList['result']);
+                $data = $helper->domainTable($tldRows, $_POST);
                 echo $data;
                 exit;
             }
 
-            // if (($whmcs->get_req_var("ajaxaction") == "default") && ($whmcs->get_req_var("ajaxcall") == "true")) {
-            //     $allDomainList = $helper->fetch_table_record("mod_domain_info", [], "");
-
-            //     $formattedDomainList = [];
-            //     // Loop through the original data to format it into the desired structure
-            //     foreach ($allDomainList as $domain) {
-            //         $formattedDomainList[] = (object) [
-            //             'tld' => $domain->tld,
-            //             'minPeriod' => $domain->min_period,
-            //             'maxPeriod' => $domain->max_period,
-            //             'registrationPrice' => $domain->domainregister,
-            //             'renewalPrice' => $domain->domainrenew,
-            //             'transferPrice' => $domain->domaintransfer,
-            //             'currencyCode' => $domain->currency_code
-            //         ];
-            //     }
-
-            //     $data = $helper->domainTable(($formattedDomainList), $_POST);
-            //     echo $data;
-            //     exit;
-            // }
-
             if (($whmcs->get_req_var("ajaxaction") == "Create Domain") && ($whmcs->get_req_var("ajaxcall") == "true")) {
+                $this->requireAdminToken();
 
                 $data = html_entity_decode($whmcs->get_req_var("data"));
                 parse_str($data, $dataArray);
@@ -317,19 +363,6 @@ class Controller
                     ];
 
                     $helper->insertUpdate('mod_domain_status', ['domain_id' => $domainId, 'extension' => $domain['tld']], $tldData);
-
-                    // $domainInfoData = [
-                    //     "domain_id" => $domainId,
-                    //     "tld" => $domain['tld'],
-                    //     "currency_code" => $domain['currency_code'],
-                    //     "domainregister" => $domain['domainregister'],
-                    //     "domainrenew" => $domain['domainrenew'],
-                    //     "domaintransfer" => $domain['domaintransfer'],
-                    //     // "min_period" => $domain['min_period'],
-                    //     // "max_period" => $domain['max_period'],
-                    // ];
-
-                    // $helper->insertUpdate('mod_domain_info', ['domain_id' => $domainId, 'tld' => $domain['tld']], $domainInfoData);
 
                     $productPrices = $helper->domainPrice($domain);
                     $updateproductprice = $helper->updateprice($domain['currency_code'], $domainId, $productPrices);

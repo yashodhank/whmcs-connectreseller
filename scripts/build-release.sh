@@ -19,6 +19,9 @@ name="whmcs-connectreseller-${version}"
 mkdir -p dist
 rm -f "dist/${name}.zip" "dist/${name}.zip.sha256" dist/notes.md
 
+# Refuse to ship CRLF-mangled registrar logos.
+bash "$root/scripts/check-logo-magic.sh"
+
 # Deterministic-ish zip: no extra file attributes, only install paths.
 (
   cd "$root"
