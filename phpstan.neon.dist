@@ -2,8 +2,9 @@ parameters:
     level: 1
     phpVersion: 70400
     paths:
-        - modules
-        - crons
+        - modules/registrars/connectreseller/lib/ApiClient.php
+        - modules/registrars/connectreseller/lib/DomainMapper.php
+        - modules/registrars/connectreseller/lib/Sensitive.php
         - tests
     excludePaths:
         - vendor

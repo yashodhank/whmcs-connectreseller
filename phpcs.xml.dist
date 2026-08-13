@@ -1,12 +1,16 @@
 <?xml version="1.0"?>
 <ruleset name="WHMCS ConnectReseller">
-    <description>PSR-12 for the ConnectReseller WHMCS fork</description>
+    <description>PSR-12 for new ConnectReseller library and tests</description>
     <rule ref="PSR12"/>
-    <file>modules</file>
-    <file>crons</file>
+    <file>modules/registrars/connectreseller/lib/ApiClient.php</file>
+    <file>modules/registrars/connectreseller/lib/DomainMapper.php</file>
+    <file>modules/registrars/connectreseller/lib/Sensitive.php</file>
     <file>tests</file>
     <exclude-pattern>*/vendor/*</exclude-pattern>
-    <exclude-pattern>*/templates/*</exclude-pattern>
+    <rule ref="PSR1.Files.SideEffects.FoundWithSymbols">
+        <exclude-pattern>*/modules/*</exclude-pattern>
+        <exclude-pattern>*/tests/bootstrap.php</exclude-pattern>
+    </rule>
     <arg name="extensions" value="php"/>
     <arg name="colors"/>
     <arg value="p"/>

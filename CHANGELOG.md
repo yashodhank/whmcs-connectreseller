@@ -43,5 +43,6 @@ TLD-sync addon. Vendor identity was 2.5.1.
 - Repository layout matching WHMCS install paths (`modules/`, `crons/`).
 - Vendor API documentation under `docs/vendor/`.
 - Composer dev tooling (PHPUnit, PHPStan, PHPCS).
+- Injectable `ApiClient` with mocked HTTP unit tests.
 
 [3.0.0]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.0

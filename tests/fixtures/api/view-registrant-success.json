@@ -1,0 +1,23 @@
+{
+    "responseMsg": {
+        "statusCode": 200,
+        "message": "Success",
+        "id": 0
+    },
+    "responseData": {
+        "name": "Jane Reseller",
+        "companyName": "Example LLC",
+        "address1": "1 Main St",
+        "address2": "Suite 2",
+        "address3": "Floor 3",
+        "city": "Austin",
+        "stateName": "TX",
+        "countryName": "US",
+        "postalCode": "78701",
+        "phoneCode": "1",
+        "phoneNo": "5125550100",
+        "emailAddress": "jane@example.com",
+        "registrantContactId": 111,
+        "kycStatus": false
+    }
+}

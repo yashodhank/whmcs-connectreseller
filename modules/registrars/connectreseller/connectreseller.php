@@ -6,6 +6,7 @@ if (!defined("WHMCS")) {
 
 use WHMCS\Module\Registrar\ConnectReseller\Helper;
 use WHMCS\Module\Registrar\ConnectReseller\Sensitive;
+use WHMCS\Module\Registrar\ConnectReseller\DomainMapper;
 use WHMCS\Domains\DomainLookup\ResultsList;
 use WHMCS\Domains\DomainLookup\SearchResult;
 use WHMCS\Domain\TopLevel\ImportItem;
@@ -35,11 +36,7 @@ function connectreseller_GetNameservers($params)
     try {
         $helper = new Helper();
 
-        $domainname = $params["sld"] . '.' . $params["tld"];
-        if (!mb_check_encoding($domainname, 'ASCII')) {
-
-            $domainname = urlencode($domainname);
-        }
+        $domainname = DomainMapper::websiteName($params["sld"], $params["tld"]);
 
 
 
@@ -52,20 +49,7 @@ function connectreseller_GetNameservers($params)
             return $values;
         }
         $response = $response['result'];
-
-        $values["ns1"] = $response["responseData"]['nameserver1'];
-        $values["ns2"] = $response["responseData"]['nameserver2'];
-        $values["ns3"] = $response["responseData"]['nameserver3'];
-        $values["ns4"] = $response["responseData"]['nameserver4'];
-        $values["ns5"] = $response["responseData"]['nameserver5'];
-        $values["ns6"] = $response["responseData"]['nameserver6'];
-        $values["ns7"] = $response["responseData"]['nameserver7'];
-        $values["ns8"] = $response["responseData"]['nameserver8'];
-        $values["ns9"] = $response["responseData"]['nameserver9'];
-        $values["ns10"] = $response["responseData"]['nameserver10'];
-        $values["ns11"] = $response["responseData"]['nameserver11'];
-        $values["ns12"] = $response["responseData"]['nameserver12'];
-        $values["ns13"] = $response["responseData"]['nameserver13'];
+        $values = DomainMapper::nameservers($response["responseData"]);
 
         return $values;
     } catch (\Exception $e) {
@@ -87,11 +71,7 @@ function connectreseller_SaveNameservers($params)
         $nameserver3 = $params["ns3"];
         $nameserver4 = $params["ns4"];
         $nameserver5 = $params["ns5"];
-        $domainname = $params["sld"] . '.' . $params["tld"];
-        if (!mb_check_encoding($domainname, 'ASCII')) {
-
-            $domainname = urlencode($domainname);
-        }
+        $domainname = DomainMapper::websiteName($params["sld"], $params["tld"]);
         $viewDomainurl = "ViewDomain/?APIKey=" . $ApiKey . '&websiteName=' . $domainname;
 
         $res = $helper->get($viewDomainurl, [], "SaveNameservers ViewDomain");
@@ -145,11 +125,7 @@ function connectreseller_GetRegistrarLock($params)
         $sld = $params["sld"];
         $ApiKey = $params['APIKey'];
 
-        $domainname = $params["sld"] . '.' . $params["tld"];
-        if (!mb_check_encoding($domainname, 'ASCII')) {
-
-            $domainname = urlencode($domainname);
-        }
+        $domainname = DomainMapper::websiteName($params["sld"], $params["tld"]);
 
         $viewDomainurl = "ViewDomain/?APIKey=" . $ApiKey . '&websiteName=' . $domainname;
         $viewDomainurl = trim($viewDomainurl);
@@ -163,13 +139,7 @@ function connectreseller_GetRegistrarLock($params)
         }
         $response = $response['result'];
 
-        if ($response["responseData"]['isThiefProtected'] == "True") {
-            $lockstatus = "locked";
-        } else {
-            $lockstatus = "unlocked";
-        }
-
-        return $lockstatus;
+        return DomainMapper::lockStatus($response["responseData"]['isThiefProtected']);
     } catch (\Exception $e) {
         return array(
             'error' => $e->getMessage(),
@@ -190,11 +160,7 @@ function connectreseller_SaveRegistrarLock($params)
         } else {
             $DomainLockStatus = 'true';
         }
-        $domainname = $params["sld"] . '.' . $params["tld"];
-        if (!mb_check_encoding($domainname, 'ASCII')) {
-
-            $domainname = urlencode($domainname);
-        }
+        $domainname = DomainMapper::websiteName($params["sld"], $params["tld"]);
 
         $viewDomainurl = "ViewDomain/?APIKey=" . $ApiKey . '&websiteName=' . $domainname;
 
@@ -233,11 +199,7 @@ function connectreseller_GetDNS($params)
         $sld = $params["sld"];
         $ApiKey = $params['APIKey'];
 
-        $domainname = $params["sld"] . '.' . $params["tld"];
-        if (!mb_check_encoding($domainname, 'ASCII')) {
-
-            $domainname = urlencode($domainname);
-        }
+        $domainname = DomainMapper::websiteName($params["sld"], $params["tld"]);
         $viewDomainurl = "ViewDomain/?APIKey=" . $ApiKey . '&websiteName=' . $domainname;
         $viewDomainurl = trim($viewDomainurl);
         $viewDomainurl = str_replace(' ', '%20', $viewDomainurl);
@@ -331,11 +293,7 @@ function connectreseller_SaveDNS($params)
         $websitename = $sld . '.' . $tld;
         # Put your code to get the lock status here
 
-        $domainname = $params["sld"] . '.' . $params["tld"];
-        if (!mb_check_encoding($domainname, 'ASCII')) {
-
-            $domainname = urlencode($domainname);
-        }
+        $domainname = DomainMapper::websiteName($params["sld"], $params["tld"]);
         $viewDomainurl = "ViewDomain/?APIKey=" . $ApiKey . '&websiteName=' . $domainname;
         $viewDomainurl = trim($viewDomainurl);
         $viewDomainurl = str_replace(' ', '%20', $viewDomainurl);
@@ -916,24 +874,9 @@ function connectreseller_GetContactDetails($params)
             return $values;
         }
         $contactDetailsRes = $res['result'];
-
-        $result = array();
-        $result['name'] = $contactDetailsRes["responseData"]['name'];
-        $result['Company'] = $contactDetailsRes["responseData"]['companyName'];
-        $result['Address1'] = $contactDetailsRes["responseData"]['address1'];
-        $result['Address2'] = $contactDetailsRes["responseData"]['address2'];;
-        $result['Address3'] = $contactDetailsRes["responseData"]['address3'];
-        $result['City'] = $contactDetailsRes["responseData"]['city'];
-        $result['State'] = $contactDetailsRes["responseData"]['stateName'];
-        $result['Country'] = $contactDetailsRes["responseData"]['countryName'];
-        $result['Zip'] = $contactDetailsRes["responseData"]['postalCode'];
-        $result['PhoneNo_CountryCode'] = $contactDetailsRes["responseData"]['phoneCode'];
-        $result['PhoneNo'] = $contactDetailsRes["responseData"]['phoneNo'];
-        $result['PhoneNo'] = substr($result['PhoneNo'], 0, 10);
-        $result['emailaddr'] = $contactDetailsRes["responseData"]['emailAddress'];
-        $values['Registrant'] = array('Full Name' => $result['name'], 'Email' => $result['emailaddr'], 'Company Name' => $result['Company'], 'Address 1' => $result['Address1'], 'Address 2' => $result['Address2'], 'Address 3' => $result['Address3'], 'City' => $result['City'], 'State' => $result['State'], 'Country' => $result['Country'], 'Postcode' => $result['Zip'], 'Phone Number' => $result['PhoneNo_CountryCode'] . $result['PhoneNo']); // 
+        $values['Registrant'] = DomainMapper::contactFields($contactDetailsRes["responseData"]);
         if ($RegistrantContactId === $TechnicalContactId) {
-            $values['Technical'] = array('Full Name' => $result['name'], 'Email' => $result['emailaddr'], 'Company Name' => $result['Company'], 'Address 1' => $result['Address1'], 'Address 2' => $result['Address2'], 'Address 3' => $result['Address3'], 'City' => $result['City'], 'State' => $result['State'], 'Country' => $result['Country'], 'Postcode' => $result['Zip'], 'Phone Number' => $result['PhoneNo_CountryCode'] . $result['PhoneNo']);
+            $values['Technical'] = $values['Registrant'];
         } else {
             $GetContactDetails1 = 'ViewRegistrant?APIKey=' . $ApiKey . '&RegistrantContactId=' . $TechnicalContactId;
             $GetContactDetails1 = trim($GetContactDetails1);
@@ -946,26 +889,11 @@ function connectreseller_GetContactDetails($params)
                 return $values;
             }
             $contactDetailsRes1 = $res['result'];
-
-            $result1 = array();
-            $result1['name'] = $contactDetailsRes1["responseData"]['name'];
-            $result1['Company'] = $contactDetailsRes1["responseData"]['companyName'];
-            $result1['Address1'] = $contactDetailsRes1["responseData"]['address1'];
-            $result1['Address2'] = $contactDetailsRes1["responseData"]['address2'];;
-            $result1['Address3'] = $contactDetailsRes1["responseData"]['address3'];
-            $result1['City'] = $contactDetailsRes1["responseData"]['city'];
-            $result1['State'] = $contactDetailsRes1["responseData"]['stateName'];
-            $result1['Country'] = $contactDetailsRes1["responseData"]['countryName'];
-            $result1['Zip'] = $contactDetailsRes1["responseData"]['postalCode'];
-            $result1['PhoneNo_CountryCode'] = $contactDetailsRes1["responseData"]['phoneCode'];
-            $result1['PhoneNo'] = $contactDetailsRes1["responseData"]['phoneNo'];
-            $result1['PhoneNo'] = substr($result1['PhoneNo'], 0, 10);
-            $result1['emailaddr'] = $contactDetailsRes1["responseData"]['emailAddress'];
-            $values['Technical'] = array('Full Name' => $result1['name'], 'Email' => $result1['emailaddr'], 'Company Name' => $result1['Company'], 'Address 1' => $result1['Address1'], 'Address 2' => $result1['Address2'], 'Address 3' => $result1['Address3'], 'City' => $result1['City'], 'State' => $result1['State'], 'Country' => $result1['Country'], 'Postcode' => $result1['Zip'], 'Phone Number' => $result1['PhoneNo_CountryCode'] . $result1['PhoneNo']);
+            $values['Technical'] = DomainMapper::contactFields($contactDetailsRes1["responseData"]);
         }
 
         if ($RegistrantContactId === $BillingContactId) {
-            $values['Billing'] = array('Full Name' => $result['name'], 'Email' => $result['emailaddr'], 'Company Name' => $result['Company'], 'Address 1' => $result['Address1'], 'Address 2' => $result['Address2'], 'Address 3' => $result['Address3'], 'City' => $result['City'], 'State' => $result['State'], 'Country' => $result['Country'], 'Postcode' => $result['Zip'], 'Phone Number' => $result['PhoneNo_CountryCode'] . $result['PhoneNo']);
+            $values['Billing'] = $values['Registrant'];
         } else {
             $GetContactDetails2 = 'ViewRegistrant?APIKey=' . $ApiKey . '&RegistrantContactId=' . $BillingContactId;
             $GetContactDetails2 = trim($GetContactDetails2);
@@ -979,26 +907,11 @@ function connectreseller_GetContactDetails($params)
                 return $values;
             }
             $contactDetailsRes2 = $res['result'];
-
-            $result2 = array();
-            $result2['name'] = $contactDetailsRes2["responseData"]['name'];
-            $result2['Company'] = $contactDetailsRes2["responseData"]['companyName'];
-            $result2['Address1'] = $contactDetailsRes2["responseData"]['address1'];
-            $result2['Address2'] = $contactDetailsRes2["responseData"]['address2'];
-            $result2['Address3'] = $contactDetailsRes2["responseData"]['address3'];
-            $result2['City'] = $contactDetailsRes2["responseData"]['city'];
-            $result2['State'] = $contactDetailsRes2["responseData"]['stateName'];
-            $result2['Country'] = $contactDetailsRes2["responseData"]['countryName'];
-            $result2['Zip'] = $contactDetailsRes2["responseData"]['postalCode'];
-            $result2['PhoneNo_CountryCode'] = $contactDetailsRes2["responseData"]['phoneCode'];
-            $result2['PhoneNo'] = $contactDetailsRes2["responseData"]['phoneNo'];
-            $result2['PhoneNo'] = substr($result2['PhoneNo'], 0, 10);
-            $result2['emailaddr'] = $contactDetailsRes2["responseData"]['emailAddress'];
-            $values['Billing'] = array('Full Name' => $result2['name'], 'Email' => $result2['emailaddr'], 'Company Name' => $result2['Company'], 'Address 1' => $result2['Address1'], 'Address 2' => $result2['Address2'], 'Address 3' => $result2['Address3'], 'City' => $result2['City'], 'State' => $result2['State'], 'Country' => $result2['Country'], 'Postcode' => $result2['Zip'], 'Phone Number' => $result2['PhoneNo_CountryCode'] . $result2['PhoneNo']);
+            $values['Billing'] = DomainMapper::contactFields($contactDetailsRes2["responseData"]);
         }
 
         if ($RegistrantContactId === $AdminContactId) {
-            $values['Admin'] = array('Full Name' => $result['name'], 'Email' => $result['emailaddr'], 'Company Name' => $result['Company'], 'Address 1' => $result['Address1'], 'Address 2' => $result['Address2'], 'Address 3' => $result['Address3'], 'City' => $result['City'], 'State' => $result['State'], 'Country' => $result['Country'], 'Postcode' => $result['Zip'], 'Phone Number' => $result['PhoneNo_CountryCode'] . $result['PhoneNo']);
+            $values['Admin'] = $values['Registrant'];
         } else {
 
             $GetContactDetails3 = 'ViewRegistrant?APIKey=' . $ApiKey . '&RegistrantContactId=' . $AdminContactId;
@@ -1012,22 +925,7 @@ function connectreseller_GetContactDetails($params)
                 return $values;
             }
             $contactDetailsRes3 = $res['result'];
-
-            $result3 = array();
-            $result3['name'] = $contactDetailsRes3["responseData"]['name'];
-            $result3['Company'] = $contactDetailsRes3["responseData"]['companyName'];
-            $result3['Address1'] = $contactDetailsRes3["responseData"]['address1'];
-            $result3['Address2'] = $contactDetailsRes3["responseData"]['address2'];
-            $result3['Address3'] = $contactDetailsRes3["responseData"]['address3'];
-            $result3['City'] = $contactDetailsRes3["responseData"]['city'];
-            $result3['State'] = $contactDetailsRes3["responseData"]['stateName'];
-            $result3['Country'] = $contactDetailsRes3["responseData"]['countryName'];
-            $result3['Zip'] = $contactDetailsRes3["responseData"]['postalCode'];
-            $result3['PhoneNo_CountryCode'] = $contactDetailsRes3["responseData"]['phoneCode'];
-            $result3['PhoneNo'] = $contactDetailsRes3["responseData"]['phoneNo'];
-            $result3['PhoneNo'] = substr($result3['PhoneNo'], 0, 10);
-            $result3['emailaddr'] = $contactDetailsRes3["responseData"]['emailAddress'];
-            $values['Admin'] = array('Full Name' => $result3['name'], 'Email' => $result3['emailaddr'], 'Company Name' => $result3['Company'], 'Address 1' => $result3['Address1'], 'Address 2' => $result3['Address2'], 'Address 3' => $result3['Address3'], 'City' => $result3['City'], 'State' => $result3['State'], 'Country' => $result3['Country'], 'Postcode' => $result3['Zip'], 'Phone Number' => $result3['PhoneNo_CountryCode'] . $result3['PhoneNo']);
+            $values['Admin'] = DomainMapper::contactFields($contactDetailsRes3["responseData"]);
         }
 
         return $values;
@@ -1104,11 +1002,7 @@ function connectreseller_GetEPPCode($params)
         $sld = $params["sld"];
         $ApiKey = $params['APIKey'];
 
-        $domainname = $params["sld"] . '.' . $params["tld"];
-        $websitename = $domainname;
-        if (!mb_check_encoding($domainname, 'ASCII')) {
-            $websitename = urlencode($domainname);
-        }
+        $websitename = DomainMapper::websiteName($params["sld"], $params["tld"]);
 
         $viewDomainurl = "ViewDomain/?APIKey=" . $ApiKey . '&websiteName=' . $websitename;
         $viewDomainurl = trim($viewDomainurl);

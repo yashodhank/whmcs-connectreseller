@@ -30,3 +30,7 @@ jobs:
           find modules crons tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: PHPUnit
         run: vendor/bin/phpunit
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=512M
+      - name: PHPCS
+        run: vendor/bin/phpcs
