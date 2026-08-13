@@ -8,9 +8,8 @@ use WHMCS\Module\Registrar\ConnectReseller\Helper;
 use WHMCS\Domains\DomainLookup\ResultsList;
 use WHMCS\Domains\DomainLookup\SearchResult;
 use WHMCS\Domain\TopLevel\ImportItem;
-use WHMCS\Database\Capsule;	
+use WHMCS\Database\Capsule;
 
-ini_set("display_errors", "1");
 $apiUrl = "https://api.connectreseller.com/ConnectReseller/";
 
 function connectreseller_getConfigArray()
@@ -348,6 +347,7 @@ function connectreseller_SaveDNS($params)
             return $values;
         }
         $res = $res['result'];
+        $values = array('success' => true);
 
         $websiteId = $res["responseData"]['websiteId'];
 
@@ -984,8 +984,8 @@ function connectreseller_GetContactDetails($params)
             $result2 = array();
             $result2['name'] = $contactDetailsRes2["responseData"]['name'];
             $result2['Company'] = $contactDetailsRes2["responseData"]['companyName'];
+            $result2['Address1'] = $contactDetailsRes2["responseData"]['address1'];
             $result2['Address2'] = $contactDetailsRes2["responseData"]['address2'];
-            $result2['Address2'] = $contactDetailsRes2["responseData"]['address2'];;
             $result2['Address3'] = $contactDetailsRes2["responseData"]['address3'];
             $result2['City'] = $contactDetailsRes2["responseData"]['city'];
             $result2['State'] = $contactDetailsRes2["responseData"]['stateName'];
@@ -993,9 +993,9 @@ function connectreseller_GetContactDetails($params)
             $result2['Zip'] = $contactDetailsRes2["responseData"]['postalCode'];
             $result2['PhoneNo_CountryCode'] = $contactDetailsRes2["responseData"]['phoneCode'];
             $result2['PhoneNo'] = $contactDetailsRes2["responseData"]['phoneNo'];
-            $result2['PhoneNo'] = substr($result2['PhoneNo'], 0, 20);
+            $result2['PhoneNo'] = substr($result2['PhoneNo'], 0, 10);
             $result2['emailaddr'] = $contactDetailsRes2["responseData"]['emailAddress'];
-            $values['Billing'] = array('Full Name' => $result2['name'], 'Email' => $result2['emailaddr'], 'Company Name' => $result2['Company'], 'Address 2' => $result2['Address2'], 'Address 2' => $result2['Address2'], 'Address 3' => $result2['Address3'], 'City' => $result2['City'], 'State' => $result2['State'], 'Country' => $result2['Country'], 'Postcode' => $result2['Zip'], 'Phone Number' => $result2['PhoneNo_CountryCode'] . $result2['PhoneNo']);
+            $values['Billing'] = array('Full Name' => $result2['name'], 'Email' => $result2['emailaddr'], 'Company Name' => $result2['Company'], 'Address 1' => $result2['Address1'], 'Address 2' => $result2['Address2'], 'Address 3' => $result2['Address3'], 'City' => $result2['City'], 'State' => $result2['State'], 'Country' => $result2['Country'], 'Postcode' => $result2['Zip'], 'Phone Number' => $result2['PhoneNo_CountryCode'] . $result2['PhoneNo']);
         }
 
         if ($RegistrantContactId === $AdminContactId) {
@@ -1004,7 +1004,7 @@ function connectreseller_GetContactDetails($params)
 
             $GetContactDetails3 = 'ViewRegistrant?APIKey=' . $ApiKey . '&RegistrantContactId=' . $AdminContactId;
             $GetContactDetails3 = trim($GetContactDetails3);
-            $GetContactDetails3 = str_replace(' ', '%30', $GetContactDetails3);
+            $GetContactDetails3 = str_replace(' ', '%20', $GetContactDetails3);
 
             $res = $helper->get($GetContactDetails3, [], "ViewRegistrant");
 
@@ -1017,8 +1017,8 @@ function connectreseller_GetContactDetails($params)
             $result3 = array();
             $result3['name'] = $contactDetailsRes3["responseData"]['name'];
             $result3['Company'] = $contactDetailsRes3["responseData"]['companyName'];
-            $result3['Address3'] = $contactDetailsRes3["responseData"]['address3'];
-            $result3['Address3'] = $contactDetailsRes3["responseData"]['address3'];;
+            $result3['Address1'] = $contactDetailsRes3["responseData"]['address1'];
+            $result3['Address2'] = $contactDetailsRes3["responseData"]['address2'];
             $result3['Address3'] = $contactDetailsRes3["responseData"]['address3'];
             $result3['City'] = $contactDetailsRes3["responseData"]['city'];
             $result3['State'] = $contactDetailsRes3["responseData"]['stateName'];
@@ -1026,9 +1026,9 @@ function connectreseller_GetContactDetails($params)
             $result3['Zip'] = $contactDetailsRes3["responseData"]['postalCode'];
             $result3['PhoneNo_CountryCode'] = $contactDetailsRes3["responseData"]['phoneCode'];
             $result3['PhoneNo'] = $contactDetailsRes3["responseData"]['phoneNo'];
-            $result3['PhoneNo'] = substr($result3['PhoneNo'], 0, 30);
+            $result3['PhoneNo'] = substr($result3['PhoneNo'], 0, 10);
             $result3['emailaddr'] = $contactDetailsRes3["responseData"]['emailAddress'];
-            $values['Admin'] = array('Full Name' => $result3['name'], 'Email' => $result3['emailaddr'], 'Company Name' => $result3['Company'], 'Address 3' => $result3['Address3'], 'Address 3' => $result3['Address3'], 'Address 3' => $result3['Address3'], 'City' => $result3['City'], 'State' => $result3['State'], 'Country' => $result3['Country'], 'Postcode' => $result3['Zip'], 'Phone Number' => $result3['PhoneNo_CountryCode'] . $result3['PhoneNo']);
+            $values['Admin'] = array('Full Name' => $result3['name'], 'Email' => $result3['emailaddr'], 'Company Name' => $result3['Company'], 'Address 1' => $result3['Address1'], 'Address 2' => $result3['Address2'], 'Address 3' => $result3['Address3'], 'City' => $result3['City'], 'State' => $result3['State'], 'Country' => $result3['Country'], 'Postcode' => $result3['Zip'], 'Phone Number' => $result3['PhoneNo_CountryCode'] . $result3['PhoneNo']);
         }
 
         return $values;
@@ -1105,7 +1105,8 @@ function connectreseller_GetEPPCode($params)
         $sld = $params["sld"];
         $ApiKey = $params['APIKey'];
 
-        $websitename = $params["sld"] . '.' . $params["tld"];
+        $domainname = $params["sld"] . '.' . $params["tld"];
+        $websitename = $domainname;
         if (!mb_check_encoding($domainname, 'ASCII')) {
             $websitename = urlencode($domainname);
         }
@@ -1757,13 +1758,12 @@ function connectreseller_AdminDomainsTabFields($params)
             return $values;
         }
 
+        $values = array();
         $orderInfo = $helper->orderInfo($response);
 
         $values['Domain Information'] = $orderInfo;
-    } catch (Exception $ex) {
+    } catch (\Exception $ex) {
         $values['error'] = $ex->getMessage();
     }
-    if (!empty($client))
-        switchepp_logoutepp($client, $params);
     return $values;
 }

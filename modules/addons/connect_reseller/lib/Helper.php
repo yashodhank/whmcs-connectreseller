@@ -106,18 +106,19 @@ class Helper
         $url = $this->baseUrl . $apiEndUrl;
 
         $curl = curl_init();
+        $payload = (is_array($data) && count($data) > 0) ? json_encode($data) : "";
         switch ($method) {
             case 'POST':
                 curl_setopt($curl, CURLOPT_POST, 1);
-                curl_setopt($curl, CURLOPT_POSTFIELDS, (count($data) ? json_encode($data) : ""));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
                 break;
             case 'PUT':
                 curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'PUT');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, (count($data) ? json_encode($data) : ""));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
                 break;
             case 'DELETE':
                 curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'DELETE');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, (count($data) ? json_encode($data) : ""));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
                 break;
 
             default:
@@ -202,10 +203,11 @@ class Helper
             $length = isset($table['length']) ? intval($table['length']) : 10; // Number of records per page
             $draw = isset($table['draw']) ? intval($table['draw']) : 1; // Draw counter for DataTables
 
-            $dataArray = [];
+            $sourceData = is_array($data) ? $data : array();
+            $filteredData = $sourceData;
 
             if ($searchValue !== '') {
-                $filteredData = array_filter($data, function ($item) use ($searchValue) {
+                $filteredData = array_filter($sourceData, function ($item) use ($searchValue) {
                     return stripos($item->tld, $searchValue) !== false ||
                         stripos($item->registrationPrice, $searchValue) !== false ||
                         stripos($item->renewalPrice, $searchValue) !== false ||
@@ -214,11 +216,10 @@ class Helper
                         stripos($item->minPeriod, $searchValue) !== false ||
                         stripos($item->maxPeriod, $searchValue) !== false;
                 });
-            } else {
-                $filteredData = $data;
             }
 
             $paginatedData = array_slice($filteredData, $start, $length);
+            $rows = array();
 
             foreach ($paginatedData as $key => $item) {
 
@@ -258,7 +259,7 @@ class Helper
                 $marginValue = '';
                 $marginValue .= '<span class="tld-margin-heading">' . (($setMargin == 0) ? '-' : $setMargin . "%") . '</span>';
 
-                $dataArray[] = [
+                $rows[] = [
                     'checkbox' => '<input type="checkbox" name="checkbox[]" value="' . $key . '">',  // Checkbox stays as it is
                     'existtld' => $existtld,  // Checkbox stays as it is
                     'tld' => '<input type="text" name="tld[]" class="form-control tlds-import" value="' . $item->tld . '" / readonly>',  // tld as text input
@@ -273,9 +274,9 @@ class Helper
 
             $response = [
                 'draw' => $draw,
-                'recordsTotal' => count($data), // Total records in the domain list (before filtering)
-                'recordsFiltered' => count($filteredData), // Adjust this based on filtering
-                'data' => $dataArray, // Return the paginated domain data
+                'recordsTotal' => count($sourceData),
+                'recordsFiltered' => count($filteredData),
+                'data' => $rows,
             ];
 
             return json_encode($response);

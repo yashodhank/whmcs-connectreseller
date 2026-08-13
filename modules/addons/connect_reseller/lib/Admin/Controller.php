@@ -73,7 +73,7 @@ class Controller
                 $condition = ['domain_id' => $whmcs->get_req_var("tld")];
 
                 $updateReseller = $helper->insertUpdate('mod_domain_status', $condition, $data);
-                if (str_contains($updateReseller, 'Error')) {
+                if (is_string($updateReseller) && strpos($updateReseller, 'Error') !== false) {
                     $message = ["status" => false, "message" => $updateReseller];
                 } else {
                     $message = ["status" => true, "message" => $updateReseller];
