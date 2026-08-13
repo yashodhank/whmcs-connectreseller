@@ -23,18 +23,20 @@ class Helper
 
         $curl = curl_init();
 
+        $payload = (is_array($data) && count($data) > 0) ? json_encode($data) : "";
+
         switch ($method) {
             case 'POST':
                 curl_setopt($curl, CURLOPT_POST, 1);
-                curl_setopt($curl, CURLOPT_POSTFIELDS, (count($data) ? json_encode($data) : ""));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
                 break;
             case 'PUT':
                 curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'PUT');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, (count($data) ? json_encode($data) : ""));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
                 break;
             case 'DELETE':
                 curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'DELETE');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, (count($data) ? json_encode($data) : ""));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
                 break;
             default:
                 curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'GET');

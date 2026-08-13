@@ -17,6 +17,17 @@ TLD-sync addon. Vendor identity was 2.5.1.
 - License is MIT, with attribution to ConnectReseller for the original 2.5.1 code.
 - PHP language ceiling in shipped code is 7.4; CI covers 7.4, 8.1, 8.2, and 8.3.
 
+### Fixed
+
+- GetEPPCode IDN lookup used an undefined `$domainname`.
+- Admin domain tab called leftover `switchepp_logoutepp()`.
+- GetContactDetails billing/admin address mapping and `%30` encoding typo.
+- SaveDNS returned an undefined `$values` on success.
+- Addon `str_contains()` replaced with `strpos()` for PHP 7.4.
+- `count(null)` in registrar and addon Helpers (fatal on PHP 8+).
+- KYC cron undefined `$result` / `$client->clientId`.
+- Removed `ini_set("display_errors", "1")` from the registrar module.
+
 ### Added
 
 - Repository layout matching WHMCS install paths (`modules/`, `crons/`).

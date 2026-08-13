@@ -39,20 +39,19 @@ try {
 
             if ($registrantID && $client->country == 'IN') {
                 $result = sendKYCverifyEmail($client->id);
+                if (!$result) {
+                    logActivity("KYC email not sent for clientId {$client->id} (conditions not met or failed send)");
+                }
             }
-
-            if (!$result) {
-                logActivity("KYC email not sent for clientId {$client->clientId} (conditions not met or failed send)");
-            }
-        } catch (Exception $e) {
-            logActivity("KYC send failed for clientId {$client->clientId}. Error: " . $e->getMessage());
+        } catch (\Exception $e) {
+            logActivity("KYC send failed for clientId {$client->id}. Error: " . $e->getMessage());
             continue;
         }
     }
 
     logActivity("KYC Verification Email Cron completed on " . date('Y-m-d H:i:s'));
 
-} catch (Exception $e) {
+} catch (\Exception $e) {
     logActivity("Exception in KYC Verification Email Cron: " . $e->getMessage());
 }
 
@@ -80,14 +79,14 @@ try {
                     logActivity("Domain registration API error for {$order->domainname}: " . $results['error']);
                 }
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             logActivity("Domain Registration failed, Domain: {$order->domainname}, ClientId: {$order->client_id}. Error: " . $e->getMessage());
             continue;
         }
     }
 
     logActivity("Register domain on KYC verified, Cron completed on " . date('Y-m-d H:i:s'));
-} catch (Exception $e) {
+} catch (\Exception $e) {
     logActivity("Exception in Register domain on KYC verified, Cron: " . $e->getMessage());
 }
 
