@@ -1,0 +1,29 @@
+{
+    "responseMsg": {
+        "statusCode": 200,
+        "message": "Success",
+        "id": 0
+    },
+    "responseData": {
+        "websiteName": "example.com",
+        "domainNameId": 12345,
+        "websiteId": 67890,
+        "status": "Active",
+        "isDomainLocked": "false",
+        "isThiefProtected": "False",
+        "expirationDate": 1893456000000,
+        "authCode": "EPP-EXAMPLE-NOT-A-SECRET",
+        "nameserver1": "ns1.example.net",
+        "nameserver2": "ns2.example.net",
+        "nameserver3": "",
+        "nameserver4": "",
+        "nameserver5": "",
+        "registrantContactId": 111,
+        "adminContactId": 111,
+        "billingContactId": 111,
+        "technicalContactId": 111,
+        "customerId": 42,
+        "dnszoneStatus": "1",
+        "dnszoneId": 99
+    }
+}

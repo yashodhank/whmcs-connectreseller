@@ -1,0 +1,8 @@
+{
+    "responseMsg": {
+        "statusCode": 200,
+        "message": "Available Fund",
+        "id": 0
+    },
+    "responseData": 1000.5
+}

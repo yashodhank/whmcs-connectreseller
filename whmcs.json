@@ -1,0 +1,31 @@
+{
+    "schema": "1.0",
+    "type": "whmcs-module",
+    "name": "connectreseller",
+    "license": "mit",
+    "category": "domains",
+    "description": {
+        "name": "ConnectReseller",
+        "tagline": "Community-maintained ConnectReseller registrar for WHMCS 8.x and 9.x",
+        "long": "Drop-in fork of ConnectReseller WHMCS registrar 2.5.1 with PHP 7.4–8.3 support, security fixes, and a TLD price-sync addon. Keep the module directory name connectreseller so existing tblregistrars rows continue to work."
+    },
+    "logo": {
+        "filename": "logo.png"
+    },
+    "support": {
+        "homepage": "https://github.com/yashodhank/whmcs-connectreseller",
+        "learn_more": "https://www.connectreseller.com/",
+        "support_url": "https://github.com/yashodhank/whmcs-connectreseller/issues",
+        "docs_url": "https://github.com/yashodhank/whmcs-connectreseller#readme"
+    },
+    "authors": [
+        {
+            "name": "ConnectReseller (original 2.5.1)",
+            "homepage": "https://www.connectreseller.com/"
+        },
+        {
+            "name": "yashodhank",
+            "homepage": "https://github.com/yashodhank"
+        }
+    ]
+}

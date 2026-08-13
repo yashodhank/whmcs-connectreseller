@@ -1,0 +1,45 @@
+{
+    "name": "yashodhank/whmcs-connectreseller",
+    "description": "Community-maintained ConnectReseller WHMCS registrar and TLD-sync addon",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "whmcs",
+        "registrar",
+        "connectreseller",
+        "domains"
+    ],
+    "require": {
+        "php": ">=7.4 <8.4",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "phpstan/phpstan": "^1.12",
+        "squizlabs/php_codesniffer": "^3.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "WHMCS\\Module\\Registrar\\ConnectReseller\\": "modules/registrars/connectreseller/lib/",
+            "WHMCS\\Module\\Addon\\ConnectReseller\\": "modules/addons/connect_reseller/lib/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ConnectReseller\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpstan": "phpstan analyse",
+        "phpcs": "phpcs"
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "7.4.33"
+        }
+    }
+}
