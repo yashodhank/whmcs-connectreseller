@@ -1,7 +1,7 @@
 <?php
 
 use WHMCS\Database\Capsule;
-use Exception;
+use WHMCS\Module\Registrar\ConnectReseller\Sensitive;
 global $whmcs;
 
 define('CONNECTRESELLER_BASE_URL','https://api.connectreseller.com/ConnectReseller/ESHOP');
@@ -11,31 +11,67 @@ if(!defined("WHMCS")) {
     die("This file can not be accessed directly!");
 }
 
-// Create custom client field for storing Registrant Contact Id
-if(Capsule::table('tblcustomfields')->where('fieldname','like','registrantContactId|%')->where('type', 'client')->count()==0){
-    Capsule::table('tblcustomfields')->insert([
-        'type'=>'client', 'relid'=>0, 'fieldname'=>'registrantContactId|Registrant Contact Id', 'fieldtype'=>'text', 'description'=>'', 'fieldoptions'=>'', 'regexpr'=>'', 'adminonly'=> '', 'required'=>'', 'showorder'=>'', 'showinvoice'=>'', 'sortorder'=>0,
-    ]);
-}
+require_once __DIR__ . '/lib/Sensitive.php';
 
-// Create custom table to store the domain orders 
-if (!Capsule::schema()->hasTable('mod_kycpending_domains')) {
-    Capsule::schema()->create('mod_kycpending_domains', function ($table) {
-        $table->increments('id');
-        $table->text('domainid');
-        $table->string('domainname');
-        $table->string('sld');
-        $table->string('tld');
-        $table->string('client_id');
-        $table->timestamps();
-    });
+/**
+ * Create KYC custom field and pending-domain table on first use, not at include time.
+ */
+function connectreseller_ensureKycSchema()
+{
+    static $ensured = false;
+    if ($ensured) {
+        return;
+    }
+    $ensured = true;
+
+    if (Capsule::table('tblcustomfields')->where('fieldname', 'like', 'registrantContactId|%')->where('type', 'client')->count() == 0) {
+        Capsule::table('tblcustomfields')->insert([
+            'type' => 'client',
+            'relid' => 0,
+            'fieldname' => 'registrantContactId|Registrant Contact Id',
+            'fieldtype' => 'text',
+            'description' => '',
+            'fieldoptions' => '',
+            'regexpr' => '',
+            'adminonly' => '',
+            'required' => '',
+            'showorder' => '',
+            'showinvoice' => '',
+            'sortorder' => 0,
+        ]);
+    }
+
+    if (!Capsule::schema()->hasTable('mod_kycpending_domains')) {
+        Capsule::schema()->create('mod_kycpending_domains', function ($table) {
+            $table->increments('id');
+            $table->text('domainid');
+            $table->string('domainname');
+            $table->string('sld');
+            $table->string('tld');
+            $table->string('client_id');
+            $table->timestamps();
+        });
+    }
 }
 
 /* 
- Send KYC Email
+ Send KYC Email — admin session + CSRF required
 */ 
-if ($whmcs->get_req_var('formAction') === 'sendKYCVerificationEmail') {
+if (isset($whmcs) && is_object($whmcs) && $whmcs->get_req_var('formAction') === 'sendKYCVerificationEmail') {
     header('Content-Type: application/json');
+    $adminId = isset($_SESSION['adminid']) ? (int) $_SESSION['adminid'] : 0;
+    if ($adminId < 1) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit;
+    }
+    if (!function_exists('check_token')) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit;
+    }
+    check_token('WHMCS.admin.default');
+    connectreseller_ensureKycSchema();
     try {
         $userid = $whmcs->get_req_var('userId');
         $sendEmail = sendKYCverifyEmail($userid);
@@ -62,6 +98,7 @@ if ($whmcs->get_req_var('formAction') === 'sendKYCVerificationEmail') {
 add_hook("ClientAdd", 1, function($vars) 
 {
     try {
+        connectreseller_ensureKycSchema();
 
         if(isset($vars['userid'])) {
             $client_exist = viewReseller($vars['email'], $vars['userid']);
@@ -121,6 +158,7 @@ add_hook("ClientAdd", 1, function($vars)
 */ 
 add_hook('PreRegistrarRegisterDomain', 1, function($vars) {
     try {
+        connectreseller_ensureKycSchema();
 
         if(isset($vars['params'])) {
             $user = Capsule::table('tblclients')->where('id', (int) $vars['params']['client_id'])->first();
@@ -195,6 +233,7 @@ add_hook('PreRegistrarRegisterDomain', 1, function($vars) {
 */
 add_hook('AdminAreaClientSummaryPage', 1, function($vars) {
     try {
+        connectreseller_ensureKycSchema();
         if (isset($vars['userid']) && !empty($vars['userid'])) {
             $userid = (int)$vars['userid'];
             $registrantStatus = getRegistrantStatus($userid);
@@ -206,12 +245,14 @@ add_hook('AdminAreaClientSummaryPage', 1, function($vars) {
 
             // Show warning with button if not verified
             $status = !empty($registrantStatus['status']) ? $registrantStatus['status'] : "Not Verified";
+            $statusEscaped = Sensitive::escapeHtml($status);
+            $useridEscaped = (int) $userid;
 
             return <<<HTML
                 <div class="alert alert-warning" id="kyc-status-wrapper" style="display:inline-block; padding:6px 12px; border-radius:4px;">
                     KYC Verification Status: 
-                    <strong>$status</strong> 
-                    <a href="#" id="sendKYCVerificationEmail" data-userid="{$userid}" class="btn btn-primary btn-sm" style="margin-left:10px;">Send Email</a>
+                    <strong>{$statusEscaped}</strong> 
+                    <a href="#" id="sendKYCVerificationEmail" data-userid="{$useridEscaped}" class="btn btn-primary btn-sm" style="margin-left:10px;">Send Email</a>
                 </div>
 
                 <script type="text/javascript">
@@ -222,6 +263,7 @@ add_hook('AdminAreaClientSummaryPage', 1, function($vars) {
                         var \$btn = $(this);
                         var userId = \$btn.data('userid');
                         var \$parent = $('#kyc-status-wrapper');
+                        var token = (typeof csrfToken !== 'undefined') ? csrfToken : '';
 
                         \$btn.html('<span class="spinner-border spinner-border-sm"></span> Sending...')
                              .prop('disabled', true);
@@ -231,16 +273,14 @@ add_hook('AdminAreaClientSummaryPage', 1, function($vars) {
                             dataType: 'json',
                             data: {
                                 userId: userId,
-                                formAction: 'sendKYCVerificationEmail'
+                                formAction: 'sendKYCVerificationEmail',
+                                token: token
                             },
                             success: function(response) {
-                                if(response.status === 'success') {
-                                    var \$msg = $('<div class="alert alert-success" style="display:inline-block; padding:6px 12px; border-radius:4px; margin-top:10px;">' + response.message + '</div>');
-                                } else if (response.status === 'success') {
-                                    var \$msg = $('<div class="alert alert-success" style="display:inline-block; padding:6px 12px; border-radius:4px; margin-top:10px;">' + response.message + '</div>');
-                                } else {
-                                    var \$msg = $('<div class="alert alert-error" style="display:inline-block; padding:6px 12px; border-radius:4px; margin-top:10px;">' + response.message + '</div>');
-                                }
+                                var message = (response && response.message) ? response.message : '';
+                                var alertClass = (response && (response.status === 'success' || response.status === 'updated')) ? 'alert-success' : 'alert-error';
+                                var \$msg = $('<div class="alert" style="display:inline-block; padding:6px 12px; border-radius:4px; margin-top:10px;"></div>');
+                                \$msg.addClass(alertClass).text(message);
 
                                 \$parent.append(\$msg);
 
@@ -293,13 +333,13 @@ add_hook('ShoppingCartCheckoutCompletePage', 1, function($vars) {
                 $not_exist = viewReseller($user->email, $user->id);
     
                 if($not_exist['status'] == "kyc_success") {
-                    return '<div class="alert alert-danger"> '.$not_exist['message'].'</div>';
+                    return '<div class="alert alert-danger"> ' . Sensitive::escapeHtml($not_exist['message']) . '</div>';
                 }
     
                 if($not_exist['status'] == "notexist_success" && $user->country == "IN" && $hasInTLD) {
                     $addSend = addReseller((array) $user);
                     if($addSend['status'] == "kyc_success") {
-                        return '<div class="alert alert-danger"> '.$not_exist['message'].'</div>';
+                        return '<div class="alert alert-danger"> ' . Sensitive::escapeHtml($not_exist['message']) . '</div>';
                     }
                 }
             }
@@ -377,7 +417,7 @@ function addReseller($vars, $newclient = null) {
             'FirstName' => $vars['firstname'],
             'LastName' => $vars['lastname'],
             'UserName' => $vars['email'],
-            'Password' => $vars['firstname']."@123",
+            'Password' => Sensitive::randomPassword(),
             'CompanyName' => $vars['companyname'],
             'Address1' => $vars['address1'],
             'City' => $vars['city'],
@@ -520,20 +560,22 @@ function callCurl($method, $data, $action)
         $apiKey = decrypt(Capsule::table('tblregistrars')->where('registrar', 'connectreseller')->where('setting', 'APIKey')->value('value'));
         $header = [];
 
-        $queryString = '';
-        if (!empty($data)) {
-            $queryString = '&' . http_build_query($data);
+        $query = array('APIKey' => $apiKey);
+        if (is_array($data)) {
+            $query = array_merge($query, $data);
         }
 
-        $url = rtrim(CONNECTRESELLER_BASE_URL, '/') . "/{$action}?APIKey={$apiKey}{$queryString}";
+        $url = rtrim(CONNECTRESELLER_BASE_URL, '/') . '/' . $action . '?' . http_build_query($query);
 
         // Initialize cURL
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);       
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
 
         // Execute request
@@ -544,10 +586,9 @@ function callCurl($method, $data, $action)
             throw new \Exception('Curl error: ' . curl_error($ch));
         }
 
-        curl_close($ch);  
+        curl_close($ch);
 
-        // Module log
-        logModuleCall( 'domainsignup', $action, $url, $responseBody);
+        logModuleCall('domainsignup', $action, Sensitive::redact($url), Sensitive::redact($responseBody));
 
         return [
             'status_code' => $httpCode,

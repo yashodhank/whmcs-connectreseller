@@ -5,6 +5,7 @@ if (!defined("WHMCS")) {
 }
 
 use WHMCS\Module\Registrar\ConnectReseller\Helper;
+use WHMCS\Module\Registrar\ConnectReseller\Sensitive;
 use WHMCS\Domains\DomainLookup\ResultsList;
 use WHMCS\Domains\DomainLookup\SearchResult;
 use WHMCS\Domain\TopLevel\ImportItem;
@@ -505,8 +506,7 @@ function connectreseller_RegisterDomain($params)
         if ($msgResult) {
 
             if ($res['responseMsg']['statusCode'] != '200') {
-                $str = "cr123456";
-                $Password = str_shuffle($str);
+                $Password = Sensitive::randomPassword();
                 $companyname = $params["companyname"];
                 $firstname = $params["fullname"];
                 $address1 = $params["address1"];
@@ -686,8 +686,7 @@ function connectreseller_TransferDomain($params)
         $msgResult = array_key_exists("responseMsg", $res);
         if ($msgResult) {
             if ($res["responseMsg"]['statusCode'] != '200') {
-                $str = "cr123456";
-                $Password = str_shuffle($str);
+                $Password = Sensitive::randomPassword();
                 $companyname = $params["companyname"];
                 $firstname = $params["fullname"];
                 $address1 = $params["address1"];

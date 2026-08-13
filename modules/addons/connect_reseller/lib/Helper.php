@@ -10,6 +10,9 @@ use WHMCS\Module\Addon\ConnectReseller\Schema;
 if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
+
+require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Sensitive.php';
+
 class Helper
 {
     public $baseUrl = "https://api.connectreseller.com/ConnectReseller/ESHOP/";
@@ -104,6 +107,7 @@ class Helper
     public function __curlCall($method, $data = null, $apiEndUrl = null, $action = '')
     {
         $url = $this->baseUrl . $apiEndUrl;
+        $url = \WHMCS\Module\Registrar\ConnectReseller\Sensitive::normalizeUrl($url);
 
         $curl = curl_init();
         $payload = (is_array($data) && count($data) > 0) ? json_encode($data) : "";
@@ -127,6 +131,8 @@ class Helper
 
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 0);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
         curl_setopt($curl, CURLOPT_FOLLOWLOCATION, 1);
@@ -140,9 +146,18 @@ class Helper
             throw new \Exception(curl_error($curl));
         }
         curl_close($curl);
-        logModuleCall("ConnectReseller", $action, $data, json_decode($response));
+        $decoded = json_decode($response);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Invalid JSON from ConnectReseller: ' . json_last_error_msg());
+        }
+        logModuleCall(
+            "ConnectReseller",
+            $action,
+            \WHMCS\Module\Registrar\ConnectReseller\Sensitive::redact($data),
+            \WHMCS\Module\Registrar\ConnectReseller\Sensitive::redact(json_decode($response, true))
+        );
 
-        return ['httpcode' => $httpCode, 'result' => json_decode($response)];
+        return ['httpcode' => $httpCode, 'result' => $decoded];
     }
 
     public function get($url, $data = null, $action = '')
