@@ -17,6 +17,9 @@ if(!defined("WHMCS")) {
 require_once __DIR__ . '/lib/Sensitive.php';
 require_once __DIR__ . '/lib/ApiClient.php';
 require_once __DIR__ . '/lib/DomainMapper.php';
+require_once __DIR__ . '/lib/CronStateStore.php';
+require_once __DIR__ . '/lib/CapsuleCronStore.php';
+require_once __DIR__ . '/lib/CronGuard.php';
 require_once __DIR__ . '/lib/KycCron.php';
 
 /**
