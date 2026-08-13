@@ -15,7 +15,7 @@ final class WhmcsContractTest extends TestCase
             dirname(__DIR__, 2) . '/modules/registrars/connectreseller/connectreseller.php'
         );
         self::assertStringContainsString("'APIVersion' => '1.1'", $source);
-        self::assertStringContainsString("define('CONNECTRESELLER_MODULE_VERSION', '3.0.2')", $source);
+        self::assertStringContainsString("define('CONNECTRESELLER_MODULE_VERSION', '3.0.3')", $source);
         self::assertStringContainsString('function connectreseller_TestConnection', $source);
         self::assertStringContainsString('function connectreseller_GetDomainInformation', $source);
         self::assertStringNotContainsString("'APIVersion' => '2.5.1'", $source);

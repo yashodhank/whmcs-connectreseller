@@ -1,7 +1,7 @@
 # ConnectReseller for WHMCS
 
 Community-maintained fork of ConnectReseller’s free open-source WHMCS registrar
-plugin **2.5.1**. Current fork release identity: **3.0.2**.
+plugin **2.5.1**. Current fork release identity: **3.0.3**.
 
 This is a drop-in replacement: keep the registrar directory name
 `connectreseller` so existing `tblregistrars` rows and production installs
@@ -14,7 +14,7 @@ GitHub Releases under the MIT license.
 
 | Field | Value |
 |-------|--------|
-| Module version | `3.0.2` |
+| Module version | `3.0.3` |
 | WHMCS registrar `APIVersion` | `1.1` (function contract; **not** the module version) |
 | PHP | **7.4–8.3** (WHMCS 8.x and 9.x) |
 | Language ceiling in shipped code | PHP **7.4** only |
