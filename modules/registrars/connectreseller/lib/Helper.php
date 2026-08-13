@@ -15,75 +15,22 @@ class Helper
 {
     public $baseUrl = "https://api.connectreseller.com/ConnectReseller/ESHOP/";
 
+    /** @var ApiClient */
+    private $apiClient;
+
+    /**
+     * @param ApiClient|null $apiClient
+     */
+    public function __construct($apiClient = null)
+    {
+        $this->apiClient = $apiClient instanceof ApiClient ? $apiClient : new ApiClient();
+    }
+
     public function __curlCall($method, $data = null, $apiEndUrl = null, $action = '')
     {
         $url = $this->baseUrl . $apiEndUrl;
-        $url = Sensitive::normalizeUrl($url);
 
-        $curl = curl_init();
-
-        $payload = (is_array($data) && count($data) > 0) ? json_encode($data) : "";
-
-        switch ($method) {
-            case 'POST':
-                curl_setopt($curl, CURLOPT_POST, 1);
-                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
-                break;
-            case 'PUT':
-                curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'PUT');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
-                break;
-            case 'DELETE':
-                curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'DELETE');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
-                break;
-            default:
-                curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'GET');
-        }
-
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
-
-        
-        curl_setopt($curl, CURLOPT_MAXREDIRS, 10); // This matches with your example
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, 1); // This matches with your example
-        curl_setopt($curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); // This matches with your example
-
-       
-
-        $response = curl_exec($curl);
-
-        
-
-        // $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-
-        if (curl_errno($curl)) {
-            throw new \Exception(curl_error($curl));
-        }
-
-        curl_close($curl);
-
-        $arrayResponse = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Invalid JSON from ConnectReseller: ' . json_last_error_msg());
-        }
-
-        $logRequest = (empty($data) ? array('url' => $url) : $data);
-        logModuleCall(
-            "Connect Reseller",
-            $action,
-            Sensitive::redact($logRequest),
-            Sensitive::redact($arrayResponse)
-        );
-
-        // Return the array result
-        return ['result' => $arrayResponse];
-
-        // logModuleCall("Connect Reseller", $action, $data, json_decode($response));
-
-        // return ['result' => json_decode($response)];
+        return $this->apiClient->requestUrl($method, $url, $data, $action);
     }
 
     function sendResponse($res)
