@@ -34,7 +34,8 @@
     "scripts": {
         "test": "phpunit",
         "phpstan": "phpstan analyse",
-        "phpcs": "phpcs"
+        "phpcs": "phpcs",
+        "check-logos": "bash scripts/check-logo-magic.sh"
     },
     "config": {
         "sort-packages": true,

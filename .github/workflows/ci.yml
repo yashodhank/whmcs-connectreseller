@@ -38,6 +38,8 @@ jobs:
         run: vendor/bin/phpstan analyse --memory-limit=512M
       - name: PHPCS
         run: vendor/bin/phpcs
+      - name: Registrar logo magic bytes
+        run: bash scripts/check-logo-magic.sh
       - name: Release zip dry-run
         env:
           VERSION: v0.0.0-ci
