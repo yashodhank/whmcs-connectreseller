@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.2] - 2026-08-13
+
+Addon Sync/Automation AJAX must return JSON on errors; CSRF must not wrap
+DataTables in HTML.
+
+### Fixed
+
+- Sync and Automation AJAX failures exit with JSON instead of WHMCS admin HTML,
+  so DataTables no longer show a false “API key” growl.
+- AJAX CSRF validation is non-fatal (JSON error) instead of `die()`.
+- Automation tab action stays on `moduleLink`.
+- Client JS no longer treats any HTML (`<`) as a missing API key.
+
+### Changed
+
+- Module / addon version is **3.0.2**.
+
+[3.0.2]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.2
+
 ## [3.0.1] - 2026-08-13
 
 Addon admin UI / UX hardening and registrar logo binary repair.
