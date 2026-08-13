@@ -25,11 +25,13 @@ rm -f "dist/${name}.zip" "dist/${name}.zip.sha256" dist/notes.md
   zip -X -r -q "dist/${name}.zip" modules crons -x "*.DS_Store" "*__MACOSX*"
 )
 
+# Basename-only checksum so `sha256sum -c` works next to the downloaded zip.
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "dist/${name}.zip" | tee "dist/${name}.zip.sha256"
+  hash="$(sha256sum "dist/${name}.zip" | awk '{print $1}')"
 else
-  shasum -a 256 "dist/${name}.zip" | tee "dist/${name}.zip.sha256"
+  hash="$(shasum -a 256 "dist/${name}.zip" | awk '{print $1}')"
 fi
+printf '%s  %s\n' "$hash" "${name}.zip" | tee "dist/${name}.zip.sha256"
 
 python3 - "$version" <<'PY'
 import re
