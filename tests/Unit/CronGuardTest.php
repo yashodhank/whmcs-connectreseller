@@ -154,4 +154,30 @@ final class CronGuardTest extends TestCase
         self::assertTrue($guard->shouldAbort(100.0, 100.0, 20));
         self::assertFalse($guard->shouldAbort(100.0, 100.0, 120));
     }
+
+    public function testWorkAfterDomainIdIsStableWhenListShifts(): void
+    {
+        $work = array(
+            array('domain_id' => 10, 'tld' => 'a'),
+            array('domain_id' => 20, 'tld' => 'b'),
+            array('domain_id' => 30, 'tld' => 'c'),
+        );
+        $after = CronGuard::workAfterDomainId($work, 20);
+        self::assertCount(1, $after);
+        self::assertSame(30, $after[0]['domain_id']);
+
+        // Removing id 10 (already done / disabled) must not skip 30 when cursor is 20.
+        $shifted = array(
+            array('domain_id' => 20, 'tld' => 'b'),
+            array('domain_id' => 30, 'tld' => 'c'),
+        );
+        $afterShift = CronGuard::workAfterDomainId($shifted, 20);
+        self::assertSame(30, $afterShift[0]['domain_id']);
+    }
+
+    public function testKycContinueOnlySemantics(): void
+    {
+        self::assertTrue(CronGuard::kycCompletedToday('2026-08-13', '2026-08-13', null));
+        self::assertFalse(CronGuard::kycCompletedToday('2026-08-13', '2026-08-13', '9'));
+    }
 }

@@ -112,6 +112,15 @@ add_hook('DailyCronJob', 1, function () {
     }
 });
 
+// Continue in-progress KYC chunks on every system cron (not only once/day).
+add_hook('AfterCronJob', 1, function () {
+    try {
+        KycCron::run(null, true);
+    } catch (\Exception $e) {
+        logActivity('ConnectReseller KYC continue via WHMCS cron failed: ' . $e->getMessage());
+    }
+});
+
 add_hook("ClientAdd", 1, function($vars) 
 {
     try {
@@ -578,9 +587,13 @@ function callCurl($method, $data, $action)
 
         $client = new ApiClient();
         $result = $client->get($action, $query, $action);
+        $httpCode = $client->getLastHttpCode();
+        if ($httpCode < 100) {
+            $httpCode = 200;
+        }
 
         return array(
-            'status_code' => 200,
+            'status_code' => $httpCode,
             'response' => json_encode($result['result']),
         );
     } catch (\Exception $e) {

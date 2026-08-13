@@ -70,5 +70,14 @@ TLD-sync addon. Vendor identity was 2.5.1.
   domains), not every row in `tblclients`.
 - Both jobs chunk work and persist a cursor so AfterCronJob / DailyCronJob stay
   inside a PHP time budget.
+- CI runs static analysis once (PHP 8.2) and PHPUnit across 7.4/8.1/8.2/8.3 with
+  Composer cache; release checksums use the zip basename for `sha256sum -c`.
+- Price sync skips frequency checks **before** taking a lock; caches `tldsync`
+  for in-progress passes; cursor is last processed domain pricing id.
+- KYC continues in-progress chunks on `AfterCronJob` (not only once per day).
+- JSON string bodies redact `APIKey` / `Password` / `authCode`; hook `callCurl`
+  returns the real HTTP status; GetDomainInformation applies registration
+  status; contact phones are no longer truncated on read.
+- Addon Enable/Disable tab shows cron last-run / cursor and manual run buttons.
 
 [3.0.0]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.0

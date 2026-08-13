@@ -8,6 +8,7 @@ if (!defined("WHMCS")) {
 
 use WHMCS\Database\Capsule;
 use WHMCS\Module\Addon\ConnectReseller\Helper;
+use WHMCS\Module\Addon\ConnectReseller\PriceSyncTask;
 // use WHMCS\Smarty;
 use Smarty;
 
@@ -44,13 +45,49 @@ class Controller
 
             if (!empty($whmcs->get_req_var("formaction"))) {
                 $formaction = $whmcs->get_req_var("formaction");
-                if($formaction == 'checkall'){
-                    Capsule::table('mod_domain_status')->update(['status'=>'on']);
-                    $formSubmitMessage = ['status'=>'success', 'message'=>$lang['TLDsStatusEnabled']];
+                if ($formaction == 'checkall') {
+                    Capsule::table('mod_domain_status')->update(['status' => 'on']);
+                    $formSubmitMessage = ['status' => 'success', 'message' => $lang['TLDsStatusEnabled']];
                 }
-                if($formaction == 'uncheckall'){
-                    Capsule::table('mod_domain_status')->update(['status'=>'off']);
-                    $formSubmitMessage = ['status'=>'success', 'message'=>$lang['TLDsStatusDisabled']];
+                if ($formaction == 'uncheckall') {
+                    Capsule::table('mod_domain_status')->update(['status' => 'off']);
+                    $formSubmitMessage = ['status' => 'success', 'message' => $lang['TLDsStatusDisabled']];
+                }
+                if ($formaction == 'runPriceSyncNow') {
+                    if (function_exists('check_token')) {
+                        check_token('WHMCS.admin.default');
+                    }
+                    $result = PriceSyncTask::run();
+                    $formSubmitMessage = [
+                        'status' => 'success',
+                        'message' => 'Price sync result: ' . $result,
+                    ];
+                }
+                if ($formaction == 'runKycNow') {
+                    if (function_exists('check_token')) {
+                        check_token('WHMCS.admin.default');
+                    }
+                    if (!class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\KycCron')) {
+                        $cronFile = dirname(__DIR__, 3) . '/registrars/connectreseller/lib/KycCron.php';
+                        if (is_readable($cronFile)) {
+                            require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/CronStateStore.php';
+                            require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/CapsuleCronStore.php';
+                            require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/CronGuard.php';
+                            require_once $cronFile;
+                        }
+                    }
+                    if (class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\KycCron')) {
+                        $result = \WHMCS\Module\Registrar\ConnectReseller\KycCron::run();
+                        $formSubmitMessage = [
+                            'status' => 'success',
+                            'message' => 'KYC cron result: ' . $result,
+                        ];
+                    } else {
+                        $formSubmitMessage = [
+                            'status' => 'success',
+                            'message' => 'KYC cron unavailable (registrar module missing)',
+                        ];
+                    }
                 }
             }
 
@@ -136,10 +173,64 @@ class Controller
             $this->tplFileName = $this->tplVar['tab'] = __FUNCTION__;
             $this->tplVar['formSubmitMessage'] = $formSubmitMessage;
             $this->tplVar['checkboxStatus'] = $checkboxStatus;
+            $this->tplVar['cronStatus'] = $this->buildCronStatus();
             $this->output();
         } catch (\Exception $e) {
             $this->tplVar['error'] = $e->getMessage();
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function buildCronStatus()
+    {
+        $status = array(
+            'price_last_run' => '',
+            'price_cursor' => '',
+            'kyc_last_run' => '',
+            'kyc_cursor' => '',
+            'price_lock' => '',
+            'kyc_lock' => '',
+        );
+        try {
+            $rows = Capsule::table('tblconfiguration')
+                ->whereIn('setting', array(
+                    'ConnectResellerPriceSyncLastRun',
+                    'ConnectResellerPriceSyncCursor',
+                    'ConnectResellerPriceSyncLock',
+                    'ConnectResellerKycCronLastRun',
+                    'ConnectResellerKycCronCursor',
+                    'ConnectResellerKycCronLock',
+                ))
+                ->get();
+            $map = array();
+            foreach ($rows as $row) {
+                $map[$row->setting] = $row->value;
+            }
+            if (!empty($map['ConnectResellerPriceSyncLastRun'])) {
+                $status['price_last_run'] = date('Y-m-d H:i:s', (int) $map['ConnectResellerPriceSyncLastRun']);
+            }
+            $status['price_cursor'] = isset($map['ConnectResellerPriceSyncCursor'])
+                ? (string) $map['ConnectResellerPriceSyncCursor']
+                : '';
+            $status['kyc_last_run'] = isset($map['ConnectResellerKycCronLastRun'])
+                ? (string) $map['ConnectResellerKycCronLastRun']
+                : '';
+            $status['kyc_cursor'] = isset($map['ConnectResellerKycCronCursor'])
+                ? (string) $map['ConnectResellerKycCronCursor']
+                : '';
+            $status['price_lock'] = isset($map['ConnectResellerPriceSyncLock'])
+                ? (string) $map['ConnectResellerPriceSyncLock']
+                : '';
+            $status['kyc_lock'] = isset($map['ConnectResellerKycCronLock'])
+                ? (string) $map['ConnectResellerKycCronLock']
+                : '';
+        } catch (\Exception $e) {
+            // ignore — admin page still renders
+        }
+
+        return $status;
     }
     public function domainsync($vars)
     {

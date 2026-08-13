@@ -17,6 +17,26 @@
                     </div>
                 {/if}
 
+                <div class="col-md-12" style="margin-bottom: 15px;">
+                    <div class="panel panel-default">
+                        <div class="panel-heading"><strong>System cron status</strong></div>
+                        <div class="panel-body">
+                            <p>Price sync last run: {$tplVar.cronStatus.price_last_run|default:'never'}
+                                {if $tplVar.cronStatus.price_cursor} (cursor domain_id {$tplVar.cronStatus.price_cursor}){/if}</p>
+                            <p>KYC last completed day: {$tplVar.cronStatus.kyc_last_run|default:'never'}
+                                {if $tplVar.cronStatus.kyc_cursor} (cursor {$tplVar.cronStatus.kyc_cursor}){/if}</p>
+                            <form method="post" action="" style="display:inline-block;margin-right:8px;">
+                                <input type="hidden" name="formaction" value="runPriceSyncNow">
+                                <button type="submit" class="btn btn-default">Run price sync now</button>
+                            </form>
+                            <form method="post" action="" style="display:inline-block;">
+                                <input type="hidden" name="formaction" value="runKycNow">
+                                <button type="submit" class="btn btn-default">Run KYC now</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="col-md-12 " style="text-align: right; padding:10px;">
                     <div  style="float: right; margin-left:5px; display:none;">
                         <form method="post" action="" style="text-align: right;" id='disabletld'>
