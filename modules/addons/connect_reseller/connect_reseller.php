@@ -42,7 +42,7 @@ function connect_reseller_config()
                 'FriendlyName' => 'Cron Frequency',
                 'Type' => 'text',
                 'Size' => '3',
-                'Description' => '(Hours) Enter Your Cron Frequency Hours Here',
+                'Description' => '(Hours) How often WHMCS system cron may sync TLD prices. No separate crontab is required when the addon is active.',
             ],
             'delete_db' => [
                 'FriendlyName' => 'Delete Database Table',

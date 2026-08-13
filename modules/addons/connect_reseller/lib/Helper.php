@@ -12,6 +12,7 @@ if (!defined("WHMCS")) {
 }
 
 require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Sensitive.php';
+require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/ApiClient.php';
 
 class Helper
 {
@@ -106,58 +107,13 @@ class Helper
 
     public function __curlCall($method, $data = null, $apiEndUrl = null, $action = '')
     {
-        $url = $this->baseUrl . $apiEndUrl;
-        $url = \WHMCS\Module\Registrar\ConnectReseller\Sensitive::normalizeUrl($url);
+        $client = new \WHMCS\Module\Registrar\ConnectReseller\ApiClient();
+        $arrayResult = $client->requestUrl($method, $this->baseUrl . $apiEndUrl, $data, $action);
 
-        $curl = curl_init();
-        $payload = (is_array($data) && count($data) > 0) ? json_encode($data) : "";
-        switch ($method) {
-            case 'POST':
-                curl_setopt($curl, CURLOPT_POST, 1);
-                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
-                break;
-            case 'PUT':
-                curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'PUT');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
-                break;
-            case 'DELETE':
-                curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'DELETE');
-                curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
-                break;
-
-            default:
-                curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'GET');
-        }
-
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 0);
-        curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, 1);
-        curl_setopt($curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-        curl_setopt($curl, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json"
-        ]);
-        $response = curl_exec($curl);
-        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        if (curl_errno($curl)) {
-            throw new \Exception(curl_error($curl));
-        }
-        curl_close($curl);
-        $decoded = json_decode($response);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Invalid JSON from ConnectReseller: ' . json_last_error_msg());
-        }
-        logModuleCall(
-            "ConnectReseller",
-            $action,
-            \WHMCS\Module\Registrar\ConnectReseller\Sensitive::redact($data),
-            \WHMCS\Module\Registrar\ConnectReseller\Sensitive::redact(json_decode($response, true))
+        return array(
+            'httpcode' => 200,
+            'result' => json_decode(json_encode($arrayResult['result'])),
         );
-
-        return ['httpcode' => $httpCode, 'result' => $decoded];
     }
 
     public function get($url, $data = null, $action = '')

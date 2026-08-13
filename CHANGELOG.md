@@ -48,4 +48,13 @@ TLD-sync addon. Vendor identity was 2.5.1.
 - Injectable `ApiClient` with mocked HTTP unit tests.
 - Tag-driven GitHub Release zip (`whmcs-connectreseller-VERSION.zip`) with SHA256.
 
+### Refactor
+
+- Shared `ApiClient` for registrar Helper, addon Helper, and hooks.
+- Lock/unlock admin and client-area actions share `DomainLock`.
+- Registrar actions live in `lib/` services (`Dns`, `Contacts`, `Transfers`, `Pricing`, `Nameservers`, `DomainLifecycle`) with thin `connectreseller_*` wrappers.
+- TLD price sync fetches `tldsync` once instead of per WHMCS TLD.
+- `.in` KYC detection no longer matches TLDs that merely end in `in` (e.g. `.berlin`).
+- Price sync and KYC run from the WHMCS system cron (`AfterCronJob` / `DailyCronJob`); standalone `crons/` scripts are optional.
+
 [3.0.0]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.0

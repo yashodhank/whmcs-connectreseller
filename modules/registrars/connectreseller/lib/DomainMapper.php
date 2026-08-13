@@ -55,6 +55,76 @@ class DomainMapper
     }
 
     /**
+     * Build UpdateNameServer query for ns1–ns13 (WHMCS commonly supplies ns1–ns5).
+     *
+     * @param array<string, mixed> $params
+     * @param string $apiKey
+     * @param string $domainname
+     * @param mixed $domainNameId
+     * @return string
+     */
+    public static function nameserverUpdateQuery(array $params, $apiKey, $domainname, $domainNameId)
+    {
+        $query = 'APIKey=' . $apiKey . '&websiteName=' . $domainname . '&domainNameId=' . $domainNameId;
+        for ($i = 1; $i <= 13; $i++) {
+            $key = 'ns' . $i;
+            if (!empty($params[$key])) {
+                $query .= '&nameServer' . $i . '=' . $params[$key];
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Map WHMCS IDN language to V11 lang code. Falls back to the ISO code from
+     * whmcsLangArray when provideLangArray has no TLD-specific entry (V11 §7.2).
+     *
+     * @param string $idnLanguage
+     * @param string $tld
+     * @param array<string, string> $whmcsArray
+     * @param array<string, array<string, mixed>> $provideLang
+     * @return string
+     */
+    public static function idnLanguageCode($idnLanguage, $tld, array $whmcsArray, array $provideLang)
+    {
+        $lang = '';
+        foreach ($whmcsArray as $key => $whmcsval) {
+            if ($whmcsval != $idnLanguage) {
+                continue;
+            }
+            if (isset($provideLang[$key]['code'])) {
+                $lang = $provideLang[$key]['code'];
+            } else {
+                $lang = strtolower((string) $whmcsval);
+            }
+            if ($tld == 'com' && $idnLanguage == 'kor') {
+                $lang = 'KOR';
+            }
+        }
+        if ($lang === '' && is_string($idnLanguage) && $idnLanguage !== '') {
+            $lang = $idnLanguage;
+        }
+
+        return $lang;
+    }
+
+    /**
+     * @param array<int, string> $domains
+     * @return bool
+     */
+    public static function listHasInDomain(array $domains)
+    {
+        foreach ($domains as $domain) {
+            if (self::isInDomain($domain)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param mixed $isThiefProtected
      * @return string
      */

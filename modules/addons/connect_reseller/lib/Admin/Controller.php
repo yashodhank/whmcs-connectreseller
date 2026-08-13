@@ -86,49 +86,42 @@ class Controller
             if (($whmcs->get_req_var("ajaxaction") == "manual Sync TLDs") && ($whmcs->get_req_var("ajaxcall") == "true")) {
 
                 $allDomainList = $helper->fetch_table_record("tbldomainpricing", [], "");
-                foreach ($allDomainList as $key => $tld) {
+                $params = $helper->CredentialRegistrar();
+                $allApiTld = $helper->get("tldsync?APIKey=" . $params['APIKey'], [], "Get Domain List");
 
+                if ($allApiTld['result']->statusCode) {
+                    $helper->sendResponse(false, $allApiTld['result']->responseText);
+                }
+
+                $byTld = array();
+                foreach ($allApiTld['result'] as $products) {
+                    if (isset($products->tld)) {
+                        $byTld[$products->tld] = $products;
+                    }
+                }
+
+                foreach ($allDomainList as $tld) {
                     $domainId = $tld->id;
                     $whmcsExtension = $tld->extension;
-
                     $where = ['domain_id' => $domainId, "extension" => $whmcsExtension];
                     $status = $helper->fetch_table_record('mod_domain_status', $where, 'singleValue', 'status');
-
-                    if ($status == "off") {
+                    if ($status == "off" || !isset($byTld[$whmcsExtension])) {
                         continue;
                     }
-
-                    $message = '';
-                    $params = $helper->CredentialRegistrar();
-                    $allApiTld = $helper->get("tldsync?APIKey=" . $params['APIKey'], [], "Get Domain List");
-
-                    if ($allApiTld['result']->statusCode) {
-                        $helper->sendResponse(false, $allApiTld['result']->responseText);
-                    }
-
-                    $price = '';
-                    foreach ($allApiTld['result'] as $key => $products) {
-
-                        if ($whmcsExtension == $products->tld) {
-                            $finalDomain = [];
-                            $finalDomain = [
-                                'tld' => $products->tld,
-                                'domainregister' => $products->registrationPrice,
-                                'domainrenew' => $products->renewalPrice,
-                                'domaintransfer' => $products->transferPrice,
-                                'currency_code' => $products->currencyCode,
-                                'min_period' => $products->minPeriod,
-                                'max_period' => $products->maxPeriod,
-                            ];
-
-                            $tldsPrices = $helper->domainPrice($finalDomain, 'true');
-
-                            $updateproductprice = $helper->updateprice($products->currencyCode, $domainId, $tldsPrices);
-
-                            if ($updateproductprice != 'success') {
-                                $helper->sendResponse(false, $lang['sync_error']);
-                            }
-                        }
+                    $products = $byTld[$whmcsExtension];
+                    $finalDomain = [
+                        'tld' => $products->tld,
+                        'domainregister' => $products->registrationPrice,
+                        'domainrenew' => $products->renewalPrice,
+                        'domaintransfer' => $products->transferPrice,
+                        'currency_code' => $products->currencyCode,
+                        'min_period' => $products->minPeriod,
+                        'max_period' => $products->maxPeriod,
+                    ];
+                    $tldsPrices = $helper->domainPrice($finalDomain, 'true');
+                    $updateproductprice = $helper->updateprice($products->currencyCode, $domainId, $tldsPrices);
+                    if ($updateproductprice != 'success') {
+                        $helper->sendResponse(false, $lang['sync_error']);
                     }
                 }
                 $helper->sendResponse(true, $lang['sync_success']);
