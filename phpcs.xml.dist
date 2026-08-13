@@ -6,6 +6,9 @@
     <file>modules/registrars/connectreseller/lib/DomainMapper.php</file>
     <file>modules/registrars/connectreseller/lib/Sensitive.php</file>
     <file>modules/registrars/connectreseller/lib/ContractSupport.php</file>
+    <file>modules/registrars/connectreseller/lib/DomainLock.php</file>
+    <file>modules/registrars/connectreseller/lib/KycCron.php</file>
+    <file>modules/addons/connect_reseller/lib/PriceSyncTask.php</file>
     <file>tests</file>
     <exclude-pattern>*/vendor/*</exclude-pattern>
     <rule ref="PSR1.Files.SideEffects.FoundWithSymbols">

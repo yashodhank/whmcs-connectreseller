@@ -2,6 +2,9 @@
 
 use WHMCS\Database\Capsule;
 use WHMCS\Module\Registrar\ConnectReseller\Sensitive;
+use WHMCS\Module\Registrar\ConnectReseller\ApiClient;
+use WHMCS\Module\Registrar\ConnectReseller\DomainMapper;
+use WHMCS\Module\Registrar\ConnectReseller\KycCron;
 global $whmcs;
 
 define('CONNECTRESELLER_BASE_URL','https://api.connectreseller.com/ConnectReseller/ESHOP');
@@ -12,6 +15,9 @@ if(!defined("WHMCS")) {
 }
 
 require_once __DIR__ . '/lib/Sensitive.php';
+require_once __DIR__ . '/lib/ApiClient.php';
+require_once __DIR__ . '/lib/DomainMapper.php';
+require_once __DIR__ . '/lib/KycCron.php';
 
 /**
  * Create KYC custom field and pending-domain table on first use, not at include time.
@@ -95,6 +101,14 @@ if (isset($whmcs) && is_object($whmcs) && $whmcs->get_req_var('formAction') === 
  Add Reseller client 
  While new WHMCS client added
 */ 
+add_hook('DailyCronJob', 1, function () {
+    try {
+        KycCron::run();
+    } catch (\Exception $e) {
+        logActivity('ConnectReseller KYC cron via WHMCS daily cron failed: ' . $e->getMessage());
+    }
+});
+
 add_hook("ClientAdd", 1, function($vars) 
 {
     try {
@@ -163,10 +177,7 @@ add_hook('PreRegistrarRegisterDomain', 1, function($vars) {
         if(isset($vars['params'])) {
             $user = Capsule::table('tblclients')->where('id', (int) $vars['params']['client_id'])->first();
 
-            $hasInTLD = false;
-            if(substr($vars['params']['domainname'], -2) === 'in') {
-                $hasInTLD = true;
-            }
+            $hasInTLD = DomainMapper::isInDomain($vars['params']['domainname']);
 
             $domanExists = Capsule::table("mod_kycpending_domains")->where('domainid', $vars['params']['domainid'])->exists();
 
@@ -324,7 +335,7 @@ add_hook('ShoppingCartCheckoutCompletePage', 1, function($vars) {
             }
         }
 
-        $hasInTLD = !empty(array_filter($domains_data, fn($d) => stripos($d, '.in') !== false));
+        $hasInTLD = DomainMapper::listHasInDomain($domains_data);
 
         if(isset($vars['clientdetails']['userid']) && !empty($vars['clientdetails']['userid'])) {
             $user = Capsule::table('tblclients')->where("id", $_SESSION['uid'])->first();
@@ -556,50 +567,24 @@ function getRegistrantStatus($uid) {
 function callCurl($method, $data, $action)
 {
     try {
-
         $apiKey = decrypt(Capsule::table('tblregistrars')->where('registrar', 'connectreseller')->where('setting', 'APIKey')->value('value'));
-        $header = [];
-
         $query = array('APIKey' => $apiKey);
         if (is_array($data)) {
             $query = array_merge($query, $data);
         }
 
-        $url = rtrim(CONNECTRESELLER_BASE_URL, '/') . '/' . $action . '?' . http_build_query($query);
+        $client = new ApiClient();
+        $result = $client->get($action, $query, $action);
 
-        // Initialize cURL
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
-
-        // Execute request
-        $responseBody = curl_exec($ch);
-        $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        if (curl_errno($ch)) {
-            throw new \Exception('Curl error: ' . curl_error($ch));
-        }
-
-        curl_close($ch);
-
-        logModuleCall('domainsignup', $action, Sensitive::redact($url), Sensitive::redact($responseBody));
-
-        return [
-            'status_code' => $httpCode,
-            'response'    => $responseBody
-        ];
-
-    } catch (Exception $e) {
-        return [
+        return array(
+            'status_code' => 200,
+            'response' => json_encode($result['result']),
+        );
+    } catch (\Exception $e) {
+        return array(
             'status_code' => 500,
-            'error'       => $e->getMessage()
-        ];
+            'error' => $e->getMessage(),
+        );
     }
 }
 

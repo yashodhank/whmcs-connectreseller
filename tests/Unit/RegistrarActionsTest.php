@@ -48,11 +48,38 @@ final class RegistrarActionsTest extends TestCase
         self::assertSame('jane@example.com', $contact['Email']);
     }
 
-    public function testLockStatusMapping(): void
+    public function testInDomainDetectionIsNotBroad(): void
     {
-        self::assertSame('locked', DomainMapper::lockStatus('True'));
-        self::assertSame('unlocked', DomainMapper::lockStatus('False'));
-        self::assertSame('locked', DomainMapper::lockStatus(true));
+        self::assertTrue(DomainMapper::isInDomain('example.in'));
+        self::assertTrue(DomainMapper::isInDomain('example.co.in'));
+        self::assertFalse(DomainMapper::isInDomain('example.berlin'));
+        self::assertFalse(DomainMapper::isInDomain('example.international'));
+        self::assertTrue(DomainMapper::listHasInDomain(array('foo.com', 'bar.co.in')));
+        self::assertFalse(DomainMapper::listHasInDomain(array('foo.com', 'bar.berlin')));
+    }
+
+    public function testNameserverUpdateQueryAlignsGetAndSave(): void
+    {
+        $query = DomainMapper::nameserverUpdateQuery(
+            array('ns1' => 'ns1.example.net', 'ns5' => 'ns5.example.net', 'ns13' => 'ns13.example.net'),
+            'key',
+            'example.com',
+            99
+        );
+        self::assertStringContainsString('nameServer1=ns1.example.net', $query);
+        self::assertStringContainsString('nameServer5=ns5.example.net', $query);
+        self::assertStringContainsString('nameServer13=ns13.example.net', $query);
+    }
+
+    public function testIdnLanguageFallsBackToWhmcsCode(): void
+    {
+        $code = DomainMapper::idnLanguageCode(
+            'pol',
+            'com',
+            array('Polish' => 'pol'),
+            array()
+        );
+        self::assertSame('pol', $code);
     }
 
     public function testGetEppCodeUsesIdnWebsiteNameWithoutNetwork(): void

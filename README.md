@@ -51,9 +51,10 @@ GitHub Releases under the MIT license.
    UI / docs; V11 authenticates with `APIKey` only. Use Brand Id as the
    reseller ID for connection tests when that field is set. **Coupon Code** is
    optional.
-5. Optionally activate the **ConnectReseller** addon for TLD price sync, then
-   schedule `crons/priceSync.php` (and `crons/kycVerification.php` if you sell
-   `.in` to Indian registrants).
+5. Optionally activate the **ConnectReseller** addon for TLD price sync.
+   The WHMCS **system cron** (`cron.php`) runs price sync via `AfterCronJob`
+   (honoring the addon **Cron Frequency** hours) and `.in` KYC via
+   `DailyCronJob`. The standalone `crons/*.php` scripts are optional fallbacks.
 
 WHMCS already emails customers. You can disable ConnectReseller panel customer
 emails under **Settings → Panel settings → Customer Emails** to avoid duplicates.
@@ -95,12 +96,24 @@ or `str_starts_with`. Typed properties and arrow functions are allowed.
 CI runs PHP 7.4, 8.1, 8.2, and 8.3. Live API integration tests are opt-in via
 `CONNECTRESELLER_API_KEY` and must never log that secret.
 
-## Cron files
+## Cron
+
+WHMCS already runs `cron.php` (typically every five minutes, with a daily
+pass). This fork hooks that schedule:
+
+| Hook | When | Job |
+|------|------|-----|
+| Addon `AfterCronJob` | Every system cron, gated by **Cron Frequency** (hours) | TLD price sync |
+| Registrar `DailyCronJob` | Once per day | `.in` KYC mail + register pending domains |
+
+Standalone scripts remain for hosts that cannot rely on hooks (or for a one-off
+run). Do **not** also crontab them if the WHMCS system cron is active, or jobs
+may run twice (KYC is additionally gated to once per calendar day).
 
 | File | Role |
 |------|------|
-| `crons/priceSync.php` | Sync TLD prices from ConnectReseller into WHMCS (respects addon enable/disable + margin) |
-| `crons/kycVerification.php` | Send `.in` KYC mail and register domains after verification (renamed from vendor `kycVerfication.php`) |
+| `crons/priceSync.php` | Optional fallback: same price sync as `AfterCronJob` |
+| `crons/kycVerification.php` | Optional fallback: same KYC job as `DailyCronJob` (renamed from vendor `kycVerfication.php`) |
 
 Point `$whmcspath` in a sibling `crons/config.php` if the WHMCS root is not the
 parent of `crons/`.
