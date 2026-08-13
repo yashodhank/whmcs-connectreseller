@@ -104,8 +104,136 @@ class Helper
             'status' => $status,
             'message' => $message,
         ];
-        echo json_encode($response);
+        echo $this->encodeJson($response);
         exit;
+    }
+
+    /**
+     * Encode a JSON payload for DataTables AJAX. Never returns false.
+     *
+     * @param mixed $data
+     * @return string
+     */
+    public function encodeJson($data)
+    {
+        $flags = JSON_UNESCAPED_UNICODE;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        $json = json_encode($data, $flags);
+        if ($json !== false) {
+            return $json;
+        }
+
+        return json_encode(array(
+            'draw' => 1,
+            'recordsTotal' => 0,
+            'recordsFiltered' => 0,
+            'data' => array(),
+            'status' => false,
+            'message' => 'Failed to encode TLD table JSON',
+        ), $flags);
+    }
+
+    /**
+     * Escape a value for an HTML attribute.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    public function htmlAttr($value)
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Build one Sync TLDs DataTables row with well-formed, escaped HTML.
+     *
+     * @param object $item
+     * @param int|string $key
+     * @param float $setMargin
+     * @param bool $tldExists
+     * @return array
+     */
+    public function formatDomainTableRow($item, $key, $setMargin, $tldExists)
+    {
+        $tld = isset($item->tld) ? (string) $item->tld : '';
+        $registration = isset($item->registrationPrice) ? (float) $item->registrationPrice : 0.0;
+        $renewal = isset($item->renewalPrice) ? (float) $item->renewalPrice : 0.0;
+        $transfer = isset($item->transferPrice) ? (float) $item->transferPrice : 0.0;
+        $currency = isset($item->currencyCode) ? (string) $item->currencyCode : '';
+        $minPeriod = isset($item->minPeriod) ? $item->minPeriod : '';
+        $maxPeriod = isset($item->maxPeriod) ? $item->maxPeriod : '';
+        $margin = is_numeric($setMargin) ? (float) $setMargin : 0.0;
+
+        $registerPrice = number_format($registration + ($registration * $margin / 100), 2, '.', '');
+        $renewPrice = number_format($renewal + ($renewal * $margin / 100), 2, '.', '');
+        $transferPrice = number_format($transfer + ($transfer * $margin / 100), 2, '.', '');
+
+        $existtld = $tldExists
+            ? '<i class="fas fa-check text-success"></i>'
+            : '<i class="fas fa-times"></i>';
+
+        $marginLabel = ($margin == 0) ? '-' : $margin . '%';
+        $marginHtml = '<span class="tld-margin-heading">' . $this->htmlAttr($marginLabel) . '</span>';
+
+        return array(
+            'checkbox' => '<input type="checkbox" name="checkbox[]" value="'
+                . $this->htmlAttr($key) . '">',
+            'existtld' => $existtld,
+            'tld' => '<input type="text" name="tld[]" class="form-control tlds-import" value="'
+                . $this->htmlAttr($tld) . '" readonly="readonly" />',
+            'registration_price' => $this->formatPriceCell(
+                'registration_price[]',
+                $registerPrice,
+                $registration,
+                $margin,
+                $marginHtml
+            ),
+            'renewal_price' => $this->formatPriceCell(
+                'renewal_price[]',
+                $renewPrice,
+                $renewal,
+                $margin,
+                $marginHtml
+            ),
+            'transfer_price' => $this->formatPriceCell(
+                'transfer_price[]',
+                $transferPrice,
+                $transfer,
+                $margin,
+                $marginHtml
+            ),
+            'currency_code' => '<input type="text" name="currency_code[]" class="form-control tlds-import" value="'
+                . $this->htmlAttr($currency) . '" readonly="readonly" />',
+            'min_period' => '<input type="hidden" name="min_period[]" value="'
+                . $this->htmlAttr($minPeriod) . '" />',
+            'max_period' => '<input type="hidden" name="max_period[]" value="'
+                . $this->htmlAttr($maxPeriod) . '" />',
+        );
+    }
+
+    /**
+     * @param string $name
+     * @param string $displayPrice
+     * @param float $cost
+     * @param float $margin
+     * @param string $marginHtml
+     * @return string
+     */
+    private function formatPriceCell($name, $displayPrice, $cost, $margin, $marginHtml)
+    {
+        $costHtml = ($margin > 0)
+            ? '<span class="remote-pricing">' . $this->htmlAttr($cost) . '</span>'
+            : '-';
+
+        return '<span class="tld-pricingg-td">'
+            . '<input type="text" name="' . $this->htmlAttr($name) . '" class="form-control" value="'
+            . $this->htmlAttr($displayPrice) . '" readonly="readonly" />'
+            . $costHtml
+            . '</span>'
+            . $marginHtml;
     }
 
     /**
@@ -124,7 +252,7 @@ class Helper
         $total = ($recordsTotal !== null) ? (int) $recordsTotal : count($rows);
         $filtered = ($recordsFiltered !== null) ? (int) $recordsFiltered : $total;
 
-        return json_encode(array(
+        return $this->encodeJson(array(
             'draw' => (int) $draw,
             'recordsTotal' => $total,
             'recordsFiltered' => $filtered,
@@ -318,58 +446,18 @@ class Helper
                 });
             }
 
+            if ($length < 0) {
+                $length = count($filteredData);
+            }
+
             $paginatedData = array_slice($filteredData, $start, $length);
             $rows = array();
 
             foreach ($paginatedData as $key => $item) {
-
-                $registerPrice = '';
-                $renewPrice = '';
-                $transferPrice = '';
-
-                // $registerPrice = $item->registrationPrice + ($item->registrationPrice * $setMargin / 100);
-                // $renewPrice = $item->renewalPrice + ($item->renewalPrice * $setMargin / 100);
-                // $transferPrice = $item->transferPrice + ($item->transferPrice * $setMargin / 100);
-
-                $registerPrice = number_format($item->registrationPrice + ($item->registrationPrice * $setMargin / 100), 2);
-                $renewPrice = number_format($item->renewalPrice + ($item->renewalPrice * $setMargin / 100), 2);
-                $transferPrice = number_format($item->transferPrice + ($item->transferPrice * $setMargin / 100), 2);
-
-                $existtld = "";
-                $checkDomainExist = Capsule::table("tbldomainpricing")
+                $tldExists = Capsule::table("tbldomainpricing")
                     ->where('extension', $item->tld)
-                    ->count();
-
-                if ($checkDomainExist > 0) {
-                    $existtld .= '<i class="fas fa-check text-success"></i>';
-                } else {
-                    $existtld .= '<i class="fas fa-times"></i>';
-                }
-
-                $registerPriceHtml = $renewPriceHtml = $transferPriceHtml = '';
-
-                if (($setMargin > 0)) {
-                    $registerPriceHtml .= '<span class="remote-pricing">' . $item->registrationPrice . '</span>';
-                    $renewPriceHtml .= '<span class="remote-pricing">' . $item->renewalPrice . '</span>';
-                    $transferPriceHtml .= '<span class="remote-pricing">' . $item->transferPrice . '</span>';
-                } else {
-                    $registerPriceHtml = $renewPriceHtml = $transferPriceHtml = '-';
-                }
-
-                $marginValue = '';
-                $marginValue .= '<span class="tld-margin-heading">' . (($setMargin == 0) ? '-' : $setMargin . "%") . '</span>';
-
-                $rows[] = [
-                    'checkbox' => '<input type="checkbox" name="checkbox[]" value="' . $key . '">',  // Checkbox stays as it is
-                    'existtld' => $existtld,  // Checkbox stays as it is
-                    'tld' => '<input type="text" name="tld[]" class="form-control tlds-import" value="' . $item->tld . '" / readonly>',  // tld as text input
-                    'registration_price' => '<span class="tld-pricingg-td"><input type="text" name="registration_price[]" class="form-control" value="' . $registerPrice  . '" / readonly>' . $registerPriceHtml ."</span>". $marginValue . '',  // registration_price as text input
-                    'renewal_price' => '<span class="tld-pricingg-td"><input type="text" name="renewal_price[]" class="form-control" value="' . $renewPrice  . '" / readonly>' . $renewPriceHtml ."</span>". $marginValue . '',  // renewal_price as text input
-                    'transfer_price' => '<span class="tld-pricingg-td"><input type="text" name="transfer_price[]" class="form-control" value="' . $transferPrice  . '" / readonly>' . $transferPriceHtml ."</span>" . $marginValue . '',  // transfer_price as text input
-                    'currency_code' => '<input type="text" name="currency_code[]" class="form-control tlds-import" value="' . $item->currencyCode . '" / readonly>',  // currency_code as text input
-                    'min_period' => '<input type="hidden" name="min_period[]" class="form-control" value="' . $item->minPeriod . '" / readonly>',  // min_period as text input
-                    'max_period' => '<input type="hidden" name="max_period[]" class="form-control" value="' . $item->maxPeriod . '" / readonly>',  // max_period as text input
-                ];
+                    ->count() > 0;
+                $rows[] = $this->formatDomainTableRow($item, $key, $setMargin, $tldExists);
             }
 
             $response = [
@@ -381,7 +469,7 @@ class Helper
                 'message' => (count($sourceData) === 0) ? 'No TLDs returned from the API' : '',
             ];
 
-            return json_encode($response);
+            return $this->encodeJson($response);
         } catch (\Exception $e) {
             $draw = isset($table['draw']) ? (int) $table['draw'] : 1;
 

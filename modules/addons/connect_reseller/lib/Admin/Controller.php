@@ -53,6 +53,7 @@ class Controller
         $this->tplVar['csrfToken'] = function_exists('generate_token')
             ? generate_token('plain')
             : '';
+        $this->tplVar['moduleVersion'] = '3.0.3';
     }
 
     /**
@@ -74,8 +75,13 @@ class Controller
      */
     private function emitJson($body)
     {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         if (!headers_sent()) {
+            http_response_code(200);
             header('Content-Type: application/json; charset=utf-8');
+            header('X-Content-Type-Options: nosniff');
         }
         echo $body;
         exit;

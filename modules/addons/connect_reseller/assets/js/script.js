@@ -3,6 +3,10 @@ $(document).ready(function () {
     var moduleUrl = addonCfg.moduleLink || window.location.href.split("#")[0];
     var csrfToken = addonCfg.token || "";
 
+    if ($.fn.dataTable && $.fn.dataTable.ext) {
+        $.fn.dataTable.ext.errMode = "none";
+    }
+
     function withCsrf(data) {
         data = data || {};
         if (csrfToken) {
@@ -58,25 +62,97 @@ $(document).ready(function () {
         }
     }
 
-    function ajaxErrorMessage(xhr) {
-        var text = (xhr && xhr.responseText) ? String(xhr.responseText) : "";
-        var trimmed = text.replace(/^\uFEFF/, "").replace(/^\s+/, "");
-        // Successful Sync payloads embed HTML form controls inside JSON strings.
-        // Only treat real HTML documents / PHP error pages as unexpected.
-        if (trimmed.charAt(0) === "{" || trimmed.charAt(0) === "[") {
-            var parsedJson = parseJsonSafe(trimmed);
-            if (parsedJson && parsedJson.message) {
-                return parsedJson.message;
-            }
+    function parseAjaxPayload(raw) {
+        if (raw && typeof raw === "object") {
+            return raw;
         }
-        if (/^</.test(trimmed) || /<\s*(!doctype|html|body|br|b|title|pre)\b/i.test(trimmed)) {
-            return "Admin returned HTML instead of JSON (session/CSRF/PHP error). Reload the page and check module logs.";
+        var text = String(raw || "").replace(/^\uFEFF/, "").replace(/^\s+/, "");
+        if (!text) {
+            return null;
         }
         var parsed = parseJsonSafe(text);
-        if (parsed && parsed.message) {
-            return parsed.message;
+        if (parsed) {
+            return parsed;
         }
-        return text || "Request failed";
+        var start = text.indexOf("{");
+        var end = text.lastIndexOf("}");
+        if (start >= 0 && end > start) {
+            return parseJsonSafe(text.slice(start, end + 1));
+        }
+        return null;
+    }
+
+    function isHtmlDocument(text) {
+        var trimmed = String(text || "").replace(/^\uFEFF/, "").replace(/^\s+/, "");
+        return /^</.test(trimmed) || /<\s*(!doctype|html|body|br|b|title|pre)\b/i.test(trimmed);
+    }
+
+    function ajaxErrorMessage(xhr) {
+        var text = (xhr && xhr.responseText) ? String(xhr.responseText) : "";
+        var parsed = parseAjaxPayload(text);
+        if (parsed && parsed.message) {
+            return String(parsed.message);
+        }
+        if (isHtmlDocument(text)) {
+            return "Admin returned HTML instead of JSON (session/CSRF/PHP error). Reload the page and check module logs.";
+        }
+        if (xhr && xhr.status && xhr.status >= 400) {
+            return "Request failed (HTTP " + xhr.status + ").";
+        }
+        return "Request failed";
+    }
+
+    function dataTablesResult(json, draw) {
+        return {
+            draw: json && json.draw ? json.draw : draw,
+            recordsTotal: json && typeof json.recordsTotal !== "undefined" ? json.recordsTotal : 0,
+            recordsFiltered: json && typeof json.recordsFiltered !== "undefined" ? json.recordsFiltered : 0,
+            data: (json && $.isArray(json.data)) ? json.data : []
+        };
+    }
+
+    function dataTablesAjax(ajaxCallFor, $table, invalidMessage) {
+        return function (dtData, callback) {
+            var payload = withCsrf($.extend({}, dtData, {
+                ajaxcall: true,
+                ajaxaction: ajaxCallFor
+            }));
+            $.ajax({
+                url: moduleUrl,
+                type: "POST",
+                data: payload,
+                dataType: "text",
+                success: function (raw) {
+                    var json = parseAjaxPayload(raw);
+                    if (json && $.isArray(json.data)) {
+                        if (json.status === false) {
+                            hideProcessing($table);
+                            growlError(json.message || "An unknown error occurred");
+                        } else if (json.message && json.data.length === 0) {
+                            var $note = $(".automation-empty-note");
+                            if ($note.length) {
+                                $note.removeClass("hidden").show();
+                            }
+                        }
+                        callback(dataTablesResult(json, dtData.draw));
+                        return;
+                    }
+                    hideProcessing($table);
+                    growlError(invalidMessage || "Invalid JSON response.");
+                    callback(dataTablesResult(null, dtData.draw));
+                },
+                error: function (xhr) {
+                    var json = parseAjaxPayload(xhr && xhr.responseText);
+                    if (json && $.isArray(json.data)) {
+                        callback(dataTablesResult(json, dtData.draw));
+                        return;
+                    }
+                    hideProcessing($table);
+                    growlError(ajaxErrorMessage(xhr));
+                    callback(dataTablesResult(null, dtData.draw));
+                }
+            });
+        };
     }
 
     var secureCall = function (data, method, url) {
@@ -164,35 +240,7 @@ $(document).ready(function () {
             serverSide: true,
             lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             pageLength: 100,
-            ajax: {
-                url: moduleUrl,
-                type: "POST",
-                data: function (d) {
-                    d.ajaxcall = true;
-                    d.ajaxaction = ajaxCallFor;
-                    d.start = d.start || 0;
-                    d.length = d.length || 10;
-                    if (csrfToken) {
-                        d.token = csrfToken;
-                    }
-                },
-                dataSrc: function (json) {
-                    if (!json || typeof json !== "object") {
-                        hideProcessing($("#domainTable"));
-                        growlError("Invalid response from Sync TLDs.");
-                        return [];
-                    }
-                    if (json.status === false) {
-                        hideProcessing($("#domainTable"));
-                        growlError(json.message || "An unknown error occurred");
-                    }
-                    return json.data || [];
-                },
-                error: function (xhr) {
-                    hideProcessing($("#domainTable"));
-                    growlError(ajaxErrorMessage(xhr));
-                }
-            },
+            ajax: dataTablesAjax(ajaxCallFor, $("#domainTable"), "Invalid response from Sync TLDs."),
             columns: [
                 { data: "checkbox", orderable: false },
                 { data: "existtld" },
@@ -239,41 +287,7 @@ $(document).ready(function () {
             serverSide: true,
             pageLength: 25,
             lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-            ajax: {
-                url: moduleUrl,
-                type: "POST",
-                data: function (d) {
-                    d.ajaxcall = true;
-                    d.ajaxaction = ajaxCallFor;
-                    d.start = d.start || 0;
-                    d.length = d.length === -1 ? 100000 : d.length;
-                    if (csrfToken) {
-                        d.token = csrfToken;
-                    }
-                },
-                dataSrc: function (json) {
-                    if (!json || typeof json !== "object") {
-                        hideProcessing($("#tldTable"));
-                        growlError("Invalid response from Automation.");
-                        return [];
-                    }
-                    if (json.status === false) {
-                        hideProcessing($("#tldTable"));
-                        growlError(json.message || "An unknown error occurred");
-                    } else if (json.message && (!json.data || !json.data.length)) {
-                        // empty-state guidance from server (import first)
-                        var $note = $(".automation-empty-note");
-                        if ($note.length) {
-                            $note.removeClass("hidden").show();
-                        }
-                    }
-                    return json.data || [];
-                },
-                error: function (xhr) {
-                    hideProcessing($("#tldTable"));
-                    growlError(ajaxErrorMessage(xhr));
-                }
-            },
+            ajax: dataTablesAjax(ajaxCallFor, $("#tldTable"), "Invalid response from Automation."),
             columns: [
                 { data: "extension" },
                 { data: "status" }
