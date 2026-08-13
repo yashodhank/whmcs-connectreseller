@@ -7,6 +7,8 @@ parameters:
         - modules/registrars/connectreseller/lib/Sensitive.php
         - modules/registrars/connectreseller/lib/ContractSupport.php
         - modules/registrars/connectreseller/lib/DomainLock.php
+        - modules/registrars/connectreseller/lib/CronStateStore.php
+        - modules/registrars/connectreseller/lib/CronGuard.php
         - tests
     excludePaths:
         - vendor
