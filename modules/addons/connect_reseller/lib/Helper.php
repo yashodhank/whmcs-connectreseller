@@ -97,6 +97,9 @@ class Helper
 
     function sendResponse($status, $message)
     {
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
         $response = [
             'status' => $status,
             'message' => $message,
