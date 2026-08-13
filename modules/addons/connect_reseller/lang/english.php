@@ -16,6 +16,7 @@ $_ADDONLANG['importdomain'] = "Import TLDs";
 $_ADDONLANG['tld'] = "TLD";
 
 $_ADDONLANG['cost'] = "Cost";
+$_ADDONLANG['price'] = "Price";
 $_ADDONLANG['current'] = "Current";
 $_ADDONLANG['margin'] = "Margin";
 
@@ -43,7 +44,10 @@ $_ADDONLANG['sync_error'] = "Something Went Wrong";
 
 $_ADDONLANG['not_produc_sync'] = "Your Domain is not synced.";
 
-$_ADDONLANG['domain_automation_note'] = "<strong>Note:</strong> This Setting will help auto sync and Import the TLD Prices for which the Status in Enabled";
+$_ADDONLANG['domain_automation_note'] = "<strong>Note:</strong> Price sync only updates TLDs whose Status is Enabled. Import TLDs on the Sync TLDs tab before enabling automation.";
+
+$_ADDONLANG['automation_empty'] = "No TLDs are listed here yet. Import them on ";
+$_ADDONLANG['bulk_toggle_label'] = "Enable/Disable all TLD statuses:";
 
 $_ADDONLANG['TLDsStatusEnabledBtn'] = 'Enable TLDs Status';
 $_ADDONLANG['TLDsStatusEnabled'] = 'TLDs status successfully changed to enabled.';

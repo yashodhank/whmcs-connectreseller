@@ -218,17 +218,15 @@ class PriceSyncTask
         }
 
         $allApiTld = $helper->get('tldsync?APIKey=' . $params['APIKey'], array(), 'Get Domain List');
-        if ($allApiTld['result']->statusCode) {
-            $guard->log('Error Occur ConnectReseller Cron ' . $allApiTld['result']->responseText);
+        if ($helper->isTldSyncError($allApiTld['result'])) {
+            $guard->log('Error Occur ConnectReseller Cron ' . $helper->tldSyncErrorMessage($allApiTld['result']));
 
             return null;
         }
 
         $byTld = array();
-        foreach ($allApiTld['result'] as $products) {
-            if (isset($products->tld)) {
-                $byTld[$products->tld] = $products;
-            }
+        foreach ($helper->normalizeTldSyncList($allApiTld['result']) as $products) {
+            $byTld[$products->tld] = $products;
         }
 
         $guard->put(CronGuard::KEY_PRICE_TLD_CACHE, json_encode($byTld));

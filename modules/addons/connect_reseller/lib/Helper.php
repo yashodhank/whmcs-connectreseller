@@ -105,6 +105,132 @@ class Helper
         exit;
     }
 
+    /**
+     * DataTables-shaped JSON for Sync / Automation AJAX (errors and empty lists).
+     *
+     * @param int $draw
+     * @param array $rows
+     * @param bool $status
+     * @param string $message
+     * @param int|null $recordsTotal
+     * @param int|null $recordsFiltered
+     * @return string
+     */
+    public function dataTablesPayload($draw, array $rows = array(), $status = true, $message = '', $recordsTotal = null, $recordsFiltered = null)
+    {
+        $total = ($recordsTotal !== null) ? (int) $recordsTotal : count($rows);
+        $filtered = ($recordsFiltered !== null) ? (int) $recordsFiltered : $total;
+
+        return json_encode(array(
+            'draw' => (int) $draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
+            'data' => $rows,
+            'status' => (bool) $status,
+            'message' => (string) $message,
+        ));
+    }
+
+    /**
+     * tldsync success is a list of TLD objects; failures are error objects with statusCode.
+     *
+     * @param mixed $result
+     * @return bool
+     */
+    public function isTldSyncError($result)
+    {
+        if ($result === null || $result === false || $result === '') {
+            return true;
+        }
+
+        if (is_array($result)) {
+            if ($result === array()) {
+                return false;
+            }
+            // Numeric list of TLD rows
+            if (isset($result[0]) || array_key_exists(0, $result)) {
+                return false;
+            }
+            if (isset($result['tld'])) {
+                return false;
+            }
+            if (isset($result['statusCode'])) {
+                $code = (int) $result['statusCode'];
+
+                return ($code !== 0 && $code !== 200);
+            }
+
+            return false;
+        }
+
+        if (is_object($result)) {
+            if (isset($result->tld)) {
+                return false;
+            }
+            // json_decode can yield ArrayObject-like lists as stdClass with numeric props;
+            // a real error object has statusCode and no tld.
+            if (isset($result->statusCode)) {
+                $code = (int) $result->statusCode;
+
+                return ($code !== 0 && $code !== 200);
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param mixed $result
+     * @return string
+     */
+    public function tldSyncErrorMessage($result)
+    {
+        if (is_object($result)) {
+            if (!empty($result->responseText)) {
+                return (string) $result->responseText;
+            }
+            if (!empty($result->message)) {
+                return (string) $result->message;
+            }
+        }
+        if (is_array($result)) {
+            if (!empty($result['responseText'])) {
+                return (string) $result['responseText'];
+            }
+            if (!empty($result['message'])) {
+                return (string) $result['message'];
+            }
+        }
+
+        return 'ConnectReseller API request failed';
+    }
+
+    /**
+     * Normalize tldsync result to a list of TLD objects for domainTable().
+     *
+     * @param mixed $result
+     * @return array
+     */
+    public function normalizeTldSyncList($result)
+    {
+        if (!is_array($result) && !is_object($result)) {
+            return array();
+        }
+
+        $list = array();
+        foreach ($result as $item) {
+            if (is_object($item) && isset($item->tld)) {
+                $list[] = $item;
+            } elseif (is_array($item) && isset($item['tld'])) {
+                $list[] = (object) $item;
+            }
+        }
+
+        return $list;
+    }
+
     public function __curlCall($method, $data = null, $apiEndUrl = null, $action = '')
     {
         $client = new \WHMCS\Module\Registrar\ConnectReseller\ApiClient();
@@ -248,14 +374,22 @@ class Helper
                 'recordsTotal' => count($sourceData),
                 'recordsFiltered' => count($filteredData),
                 'data' => $rows,
+                'status' => true,
+                'message' => (count($sourceData) === 0) ? 'No TLDs returned from the API' : '',
             ];
 
             return json_encode($response);
         } catch (\Exception $e) {
-            return json_encode([
-                'status' => 'error',
-                'description' => 'Something went wrong: ' . $e->getMessage(),
-            ], JSON_UNESCAPED_SLASHES);
+            $draw = isset($table['draw']) ? (int) $table['draw'] : 1;
+
+            return $this->dataTablesPayload(
+                $draw,
+                array(),
+                false,
+                'Something went wrong: ' . $e->getMessage(),
+                0,
+                0
+            );
         }
     }
 
@@ -405,64 +539,83 @@ class Helper
 
     public function tldsList($data)
     {
+        $draw = isset($data['draw']) ? (int) $data['draw'] : 1;
+
         try {
-            date_default_timezone_set('Asia/Qatar');
-
-            $columnNumber = $data['order'][0]['column'];
-            $ordercolumn = $data['order'][0]['dir'];
-            $searchValue = $data['search']['value'];
-
-            $columns = ['domain_id', 'extension', 'status'];
-            $columnName = isset($columns[$columnNumber]) ? $columns[$columnNumber] : 'extension'; // Default to extension if out of range
-
-            $query = Capsule::table('mod_domain_status');
-
-            if ($searchValue !== '') {
-                $query->where(function ($q) use ($searchValue) {
-                    $q->where('extension', 'LIKE', '%' . $searchValue . '%')
-                        ->orWhere('status', 'LIKE', '%' . $searchValue . '%');
-                });
+            $countTotal = Capsule::table('mod_domain_status')->count();
+            if ($countTotal === 0) {
+                return $this->dataTablesPayload(
+                    $draw,
+                    array(),
+                    true,
+                    'No TLDs configured yet. Import TLDs on the Sync TLDs tab first.',
+                    0,
+                    0
+                );
             }
 
-            $start = isset($data['start']) ? $data['start'] : 0;
-            $length = isset($data['length']) ? $data['length'] : 10; // Default length
+            $columnNumber = isset($data['order'][0]['column']) ? $data['order'][0]['column'] : 0;
+            $ordercolumn = isset($data['order'][0]['dir']) ? $data['order'][0]['dir'] : 'asc';
+            $searchValue = isset($data['search']['value']) ? $data['search']['value'] : '';
 
-            if ($length == "0") {
-                $length = Capsule::table("mod_domain_status")->count();
+            $columns = array('domain_id', 'extension', 'status');
+            $columnName = isset($columns[$columnNumber]) ? $columns[$columnNumber] : 'extension';
+
+            $applySearch = function ($query) use ($searchValue) {
+                if ($searchValue !== '') {
+                    $query->where(function ($q) use ($searchValue) {
+                        $q->where('extension', 'LIKE', '%' . $searchValue . '%')
+                            ->orWhere('status', 'LIKE', '%' . $searchValue . '%');
+                    });
+                }
+
+                return $query;
+            };
+
+            $filteredCount = $applySearch(Capsule::table('mod_domain_status'))->count();
+
+            $start = isset($data['start']) ? (int) $data['start'] : 0;
+            $length = isset($data['length']) ? (int) $data['length'] : 10;
+
+            if ($length <= 0) {
+                $length = $filteredCount > 0 ? $filteredCount : 10;
             }
 
-            $listPagesData = $query->orderBy($columnName, $ordercolumn)
+            $listPagesData = $applySearch(Capsule::table('mod_domain_status'))
+                ->orderBy($columnName, $ordercolumn)
                 ->offset($start)
                 ->limit($length)
                 ->get();
 
-            $countTotal = Capsule::table("mod_domain_status")->count();
-
-            $dataArray = [];
+            $dataArray = array();
             foreach ($listPagesData as $log) {
-                $dataArray[] = [
+                $dataArray[] = array(
                     'extension' => $log->extension,
                     'status' => '<input type="checkbox" class="toggle-checkbox" name="enable_tld" id="toggle-btn' . $log->domain_id . '" 
                     tld_id="' . $log->domain_id . '" 
                     data-status="' . ($log->status == 'on' ? 'on' : 'off') . '" 
                     ' . ($log->status == 'on' ? 'checked' : '') . '>
                     <label for="toggle-btn' . $log->domain_id . '" class="toggle-label"></label>',
-                ];
+                );
             }
 
-            $response = [
-                'draw' => intval($data['draw']),
-                'recordsTotal' => $countTotal,
-                'recordsFiltered' => $countTotal,
-                'data' => $dataArray,
-            ];
-
-            return json_encode($response);
+            return $this->dataTablesPayload(
+                $draw,
+                $dataArray,
+                true,
+                '',
+                $countTotal,
+                $filteredCount
+            );
         } catch (\Exception $e) {
-            return json_encode([
-                'status' => 'error',
-                'description' => 'Something went wrong: ' . $e->getMessage(),
-            ], JSON_UNESCAPED_SLASHES);
+            return $this->dataTablesPayload(
+                $draw,
+                array(),
+                false,
+                'Something went wrong: ' . $e->getMessage(),
+                0,
+                0
+            );
         }
     }
 }

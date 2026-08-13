@@ -140,6 +140,83 @@ ul.nav.nav-pills li a {
     margin-bottom: 20px;
 }
 
+.create-domain-toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.progress-bar-container {
+    min-width: 200px;
+    max-width: 301px;
+    flex: 1;
+}
+
+.progress-bar-track {
+    background: #e0e0e0;
+    height: 20px;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.progress-bar-track .progress-bar {
+    height: 100%;
+    background: #3498db;
+    transition: width 0.3s;
+    text-align: center;
+}
+
+.progress-bar-track .progress-percent {
+    color: #fff;
+    display: inline-block;
+}
+
+.tld-bulk-toggle {
+    margin: 0 0 12px;
+}
+
+.tld-bulk-toggle--toolbar {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 16px;
+    vertical-align: middle;
+}
+
+.tld-bulk-toggle__control {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.tld-bulk-toggle .hidden,
+.tld-bulk-toggle form.hidden {
+    display: none !important;
+}
+
+.tld-col-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    white-space: normal;
+    line-height: 1.25;
+}
+
+.tld-col-head__title {
+    font-weight: 700;
+}
+
+.tld-col-head__meta {
+    font-size: 11px;
+    font-weight: 500;
+    color: #777;
+}
+
+.automation-empty-note.hidden {
+    display: none !important;
+}
+
 .add_nav ul li a i {
     margin-right: 8px;
 }
@@ -380,12 +457,13 @@ div.dataTables_wrapper div.dataTables_filter .form-control {
 }
 
 @media (width <=1750px) {
-    table#domainTable {
-        white-space: nowrap;
+    table#domainTable th,
+    table#domainTable td {
+        white-space: normal;
     }
 
     .domainsync-box {
-        overflow: auto;
+        overflow-x: auto;
     }
 }
 
