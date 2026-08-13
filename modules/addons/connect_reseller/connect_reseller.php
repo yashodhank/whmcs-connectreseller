@@ -29,7 +29,7 @@ function connect_reseller_config()
         'description' =>  $lang["addon_desc"],
         'author' => '<a href="https://www.connectreseller.com/" target="_blank"><img src="/modules/addons/connect_reseller/assets/images/logo.svg" alt="ConnectReseller"  width="150"></a>',
         'language' => 'english',
-        'version' => '1.0',
+        'version' => '3.0.0',
         'fields' => [
             'margin' => [
                 'FriendlyName' => 'Domain Margin',

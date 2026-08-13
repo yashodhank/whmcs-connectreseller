@@ -14,6 +14,8 @@ TLD-sync addon. Vendor identity was 2.5.1.
 
 - Module version is **3.0.0**. WHMCS registrar `MetaData()['APIVersion']` is the
   function-contract version and is **1.1** (the vendor value `2.5.1` was incorrect).
+- `TestConnection` uses V11 Check Reseller Available funds (`availablefund`).
+- `GetDomainInformation` is implemented for WHMCS 7.6+.
 - License is MIT, with attribution to ConnectReseller for the original 2.5.1 code.
 - PHP language ceiling in shipped code is 7.4; CI covers 7.4, 8.1, 8.2, and 8.3.
 
