@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-08-13
+
+Addon admin UI / UX hardening and registrar logo binary repair.
+
+### Fixed
+
+- Registrar `logo.png` / `logo.gif` must remain valid binary PNG/GIF (not
+  CRLF-mangled); Domain Registrars list no longer shows a broken image when
+  logos are regenerated correctly.
+- Sync TLDs and Automation DataTables init is page-gated (`#domainTable` /
+  `#tldTable`) so the wrong table no longer leaves **Processing…** stuck.
+- Addon AJAX uses an explicit module URL and admin CSRF token
+  (`window.ConnectResellerAddon`); cron forms include CSRF tokens.
+- Missing API key / `tldsync` failures return DataTables-shaped JSON instead of
+  HTML warnings; Automation empty list explains that Sync/Import must run first.
+- `tldsync` statusCode detection distinguishes list success from error objects.
+- Cron manual-run results distinguish success vs error (e.g. KYC unavailable).
+- Sync Import reloads the table after success; Import is disabled with zero
+  selection and shows a real busy state.
+- Font Awesome loads once from the addon header; Sync nav uses a sync icon.
+- Sync table has a single Import control and clearer Price · Cost · Margin
+  column headers; reduced forced `nowrap` horizontal scroll.
+
+### Changed
+
+- Module / addon version is **3.0.1**.
+- Automation copy: “Status is Enabled”; empty-state callout links back to Sync.
+
+[3.0.1]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.1
+
 ## [3.0.0] - 2026-08-13
 
 First community-maintained release of the ConnectReseller WHMCS registrar and

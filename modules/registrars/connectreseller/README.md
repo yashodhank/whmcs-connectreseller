@@ -4,9 +4,14 @@
 
 ##### [ReleaseNotes]
 
-connectreseller.com WHMCS Registrar plug-in is an open-source plug-in that is distributed free of charge. It focuses on integrating ConnectReseller as a domain registrar at WHMCS.
+connectreseller.com WHMCS Registrar plug-in is an open-source plug-in that is
+distributed free of charge. This repository is a community-maintained fork
+(current module version **3.0.1**). It focuses on integrating ConnectReseller as
+a domain registrar at WHMCS.
 
-After the integration you can setup ConnectReseller as the default registrar for your customers and decide which services and TLDs to offer to your customers from within the WHMCS admin area.
+After the integration you can setup ConnectReseller as the default registrar for
+your customers and decide which services and TLDs to offer to your customers
+from within the WHMCS admin area.
 
 ##### Pre-requisites
 
@@ -17,8 +22,12 @@ After the integration you can setup ConnectReseller as the default registrar for
 
 ##### Download and Installation
 
-- Download the latest plugin (connectreseller-whmcs.x.x.zip) archive and extract it.
-- Create a folder called connectreseller under Modules/Registrar in your WHMCS root directory and paste the downloaded connectreseller.php and logo.gif file inside the folder (the connectreseller.php and logo.gif file are located inside the downloaded archive). The plug-in installation is complete.
+- Download the latest release zip from this repository’s GitHub Releases and
+  extract it into the WHMCS root so `modules/registrars/connectreseller/` and
+  (optionally) `modules/addons/connect_reseller/` exist.
+- Keep the registrar folder name `connectreseller`. Logo files must be binary
+  `logo.png` / `logo.gif` beside `connectreseller.php` (do not text-convert
+  them). The plug-in installation is complete.
 
 ##### Configuration
 
@@ -34,6 +43,14 @@ To configure WHMCS for use with ConnectReseller, perform the following steps:
 	![Activate Plugin](https://global.connectreseller.com/images/config.png "Configure Plugin")
 5. Click Save Changes.
 
+##### Optional addon (TLD price sync)
+
+1. Activate **ConnectReseller** under Setup → Addon Modules.
+2. In the addon admin UI, open **Sync TLDs**, select TLDs, and **Import TLDs**.
+3. Open **Automation Setting**, enable statuses for TLDs that should auto-sync.
+4. Rely on the WHMCS system cron (`AfterCronJob` + addon **Cron Frequency**,
+   default 24h). Optional `crons/*.php` scripts are not required when system
+   cron is active. KYC continues via the registrar `DailyCronJob`.
 
 That’s it. The ConnectReseller plug-in is now ready for use and will function just like any other built-in WHMCS registrar module. You can now make ConnectReseller as the automatic registrar, configure TLDs and services for all your customers. To perform these actions, click on the Setup menu, select Products/Services and click on Domain Pricing in your WHMCS admin panel:
 

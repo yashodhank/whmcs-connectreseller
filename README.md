@@ -1,7 +1,7 @@
 # ConnectReseller for WHMCS
 
 Community-maintained fork of ConnectReseller’s free open-source WHMCS registrar
-plugin **2.5.1**. First fork release identity: **3.0.0**.
+plugin **2.5.1**. Current fork release identity: **3.0.1**.
 
 This is a drop-in replacement: keep the registrar directory name
 `connectreseller` so existing `tblregistrars` rows and production installs
@@ -14,7 +14,7 @@ GitHub Releases under the MIT license.
 
 | Field | Value |
 |-------|--------|
-| Module version | `3.0.0` |
+| Module version | `3.0.1` |
 | WHMCS registrar `APIVersion` | `1.1` (function contract; **not** the module version) |
 | PHP | **7.4–8.3** (WHMCS 8.x and 9.x) |
 | Language ceiling in shipped code | PHP **7.4** only |
@@ -49,7 +49,8 @@ GitHub Releases under the MIT license.
    UI / docs; V11 authenticates with `APIKey` only. Use Brand Id as the
    reseller ID for connection tests when that field is set. **Coupon Code** is
    optional.
-5. Optionally activate the **ConnectReseller** addon for TLD price sync.
+5. Optionally activate the **ConnectReseller** addon for TLD price sync (see
+   **Addon workflow** below).
    The WHMCS **system cron** (`cron.php`) is the only required schedule: it
    runs price sync via `AfterCronJob` (honoring the addon **Cron Frequency**,
    default **24** hours) and `.in` KYC via `DailyCronJob`. Do **not** add an
@@ -61,6 +62,24 @@ Module settings so WHMCS reloads the hook cache.
 
 WHMCS already emails customers. You can disable ConnectReseller panel customer
 emails under **Settings → Panel settings → Customer Emails** to avoid duplicates.
+
+## Addon workflow
+
+1. Activate the **ConnectReseller** addon and set **Domain Margin** / **Cron
+   Frequency** as needed.
+2. Open the addon admin UI → **Sync TLDs**, wait for the API list (or a clear
+   error if the API key is missing), select TLDs, then **Import TLDs**.
+3. Open **Automation Setting**. The list is empty until you import; enable
+   statuses for TLDs that should receive automated price updates.
+4. Rely on the WHMCS system cron: `AfterCronJob` runs price sync when
+   **Cron Frequency** hours have elapsed (default 24). KYC runs from the
+   registrar `DailyCronJob`. Optional `crons/*.php` scripts are not required.
+5. Use **Run price sync now** / **Run KYC now** on the Automation tab for a
+   manual pass (admin CSRF required).
+
+Domain Registrars logo files (`logo.png` / `logo.gif`) beside
+`connectreseller.php` must remain binary PNG/GIF — do not commit them as
+text/CRLF-converted assets.
 
 ## Configuration
 
