@@ -1,0 +1,10 @@
+parameters:
+    level: 1
+    phpVersion: 70400
+    paths:
+        - modules
+        - crons
+        - tests
+    excludePaths:
+        - vendor
+    treatPhpDocTypesAsCertain: false
