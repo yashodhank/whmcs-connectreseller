@@ -14,6 +14,9 @@ class ApiClient
     /** @var callable|null */
     private $transport;
 
+    /** @var int */
+    private $lastHttpCode = 0;
+
     /**
      * @param callable|null $transport function(string $method, string $url, ?string $payload): string
      * @param string|null $baseUrl
@@ -24,6 +27,16 @@ class ApiClient
         if (is_string($baseUrl) && $baseUrl !== '') {
             $this->baseUrl = rtrim($baseUrl, '/') . '/';
         }
+    }
+
+    /**
+     * HTTP status from the most recent curl/transport call (0 if unknown).
+     *
+     * @return int
+     */
+    public function getLastHttpCode()
+    {
+        return (int) $this->lastHttpCode;
     }
 
     /**
@@ -108,6 +121,8 @@ class ApiClient
     private function dispatch($method, $url, $payload)
     {
         if (is_callable($this->transport)) {
+            $this->lastHttpCode = 200;
+
             return (string) call_user_func($this->transport, $method, $url, $payload);
         }
 
@@ -149,6 +164,7 @@ class ApiClient
             curl_close($curl);
             throw new \Exception($error);
         }
+        $this->lastHttpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
 
         return is_string($response) ? $response : '';

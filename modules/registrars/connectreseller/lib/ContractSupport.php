@@ -81,6 +81,13 @@ class ContractSupport
                 $domain->setExpiryDate($carbon);
             }
         }
+        if (!empty($info['status'])) {
+            if (method_exists($domain, 'setRegistrationStatus')) {
+                $domain->setRegistrationStatus($info['status']);
+            } elseif (method_exists($domain, 'setStatus')) {
+                $domain->setStatus($info['status']);
+            }
+        }
 
         return $domain;
     }

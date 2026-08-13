@@ -154,7 +154,7 @@ class DomainMapper
         $country = isset($responseData['countryName']) ? (string) $responseData['countryName'] : '';
         $postcode = isset($responseData['postalCode']) ? (string) $responseData['postalCode'] : '';
         $phoneCode = isset($responseData['phoneCode']) ? (string) $responseData['phoneCode'] : '';
-        $phoneNo = isset($responseData['phoneNo']) ? substr((string) $responseData['phoneNo'], 0, 10) : '';
+        $phoneNo = isset($responseData['phoneNo']) ? (string) $responseData['phoneNo'] : '';
 
         return array(
             'Full Name' => $name,

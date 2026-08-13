@@ -21,6 +21,7 @@ class CronGuard
     public const KEY_KYC_CURSOR = 'ConnectResellerKycCronCursor';
     public const KEY_PRICE_LAST_RUN = 'ConnectResellerPriceSyncLastRun';
     public const KEY_PRICE_CURSOR = 'ConnectResellerPriceSyncCursor';
+    public const KEY_PRICE_TLD_CACHE = 'ConnectResellerPriceSyncTldCache';
 
     /** @var CronStateStore */
     private $store;
@@ -266,6 +267,32 @@ class CronGuard
         }
 
         return trim((string) $apiKey) !== '';
+    }
+
+    /**
+     * Remaining work items after last processed domain pricing id.
+     *
+     * @param array<int, array<string, mixed>> $work
+     * @param mixed $lastDomainId
+     * @return array<int, array<string, mixed>>
+     */
+    public static function workAfterDomainId(array $work, $lastDomainId)
+    {
+        $lastDomainId = (int) $lastDomainId;
+        $out = array();
+        foreach ($work as $item) {
+            $id = 0;
+            if (isset($item['domain_id'])) {
+                $id = (int) $item['domain_id'];
+            } elseif (isset($item['tld']) && is_object($item['tld']) && isset($item['tld']->id)) {
+                $id = (int) $item['tld']->id;
+            }
+            if ($id > $lastDomainId) {
+                $out[] = $item;
+            }
+        }
+
+        return $out;
     }
 
     /**

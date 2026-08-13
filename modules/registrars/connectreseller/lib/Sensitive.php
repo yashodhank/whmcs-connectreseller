@@ -48,6 +48,12 @@ class Sensitive
         $value = preg_replace('/(Password=)[^&]*/i', '$1***', $value);
         $value = preg_replace('/(authCode=)[^&]*/i', '$1***', $value);
 
+        // JSON string bodies (hooks may log raw response text).
+        $value = preg_replace('/("APIKey"\s*:\s*")[^"]*(")/i', '$1***$2', $value);
+        $value = preg_replace('/("Password"\s*:\s*")[^"]*(")/i', '$1***$2', $value);
+        $value = preg_replace('/("authCode"\s*:\s*")[^"]*(")/i', '$1***$2', $value);
+        $value = preg_replace('/("AuthCode"\s*:\s*")[^"]*(")/i', '$1***$2', $value);
+
         return $value;
     }
 

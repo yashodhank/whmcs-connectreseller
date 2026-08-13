@@ -32,6 +32,28 @@ final class ApiClientTest extends TestCase
         self::assertStringNotContainsString('live-secret', $redacted);
     }
 
+    public function testRedactRemovesCredentialsInsideJsonStrings(): void
+    {
+        $json = '{"APIKey":"live-secret","Password":"p@ss","authCode":"epp-1","ok":true}';
+        $redacted = Sensitive::redact($json);
+
+        self::assertStringContainsString('"APIKey":"***"', $redacted);
+        self::assertStringContainsString('"Password":"***"', $redacted);
+        self::assertStringContainsString('"authCode":"***"', $redacted);
+        self::assertStringNotContainsString('live-secret', $redacted);
+        self::assertStringNotContainsString('p@ss', $redacted);
+        self::assertStringNotContainsString('epp-1', $redacted);
+    }
+
+    public function testLastHttpCodeDefaultsTo200ForInjectedTransport(): void
+    {
+        $client = new ApiClient(function () {
+            return '{"responseMsg":{"statusCode":200}}';
+        });
+        $client->requestUrl('GET', 'https://api.example.test/x', null, 't');
+        self::assertSame(200, $client->getLastHttpCode());
+    }
+
     public function testHasPayloadIsNullSafe(): void
     {
         self::assertFalse(ApiClient::hasPayload(null));

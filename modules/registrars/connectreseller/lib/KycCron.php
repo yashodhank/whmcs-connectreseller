@@ -16,14 +16,15 @@ class KycCron
 {
     /**
      * Send .in KYC mail and register pending domains after verification.
-     * Scoped to mod_kycpending_domains (not all clients). Chunked with a
-     * cursor so DailyCronJob can continue the next day if the time budget
-     * is hit. Last-run day is written only after the cursor is exhausted.
+     * Scoped to mod_kycpending_domains. Chunked with a domain-row id cursor.
+     * DailyCronJob starts/completes a day; AfterCronJob continues when a cursor
+     * is set ($continueOnly = true).
      *
      * @param CronGuard|null $guard
+     * @param bool $continueOnly
      * @return string
      */
-    public static function run($guard = null)
+    public static function run($guard = null, $continueOnly = false)
     {
         if (!$guard instanceof CronGuard) {
             $guard = new CronGuard();
@@ -31,6 +32,19 @@ class KycCron
 
         if (!\function_exists('sendKYCverifyEmail') || !\function_exists('getRegistrantStatus')) {
             return $guard->skip('KYC cron', 'KYC helpers unavailable');
+        }
+
+        $today = date('Y-m-d', (int) $guard->now());
+        $last = $guard->get(CronGuard::KEY_KYC_LAST_RUN);
+        $cursorRaw = $guard->get(CronGuard::KEY_KYC_CURSOR);
+        $inProgress = $cursorRaw !== null && $cursorRaw !== '';
+
+        if ($continueOnly && !$inProgress) {
+            return $guard->skip('KYC cron', 'no in-progress cursor');
+        }
+
+        if (CronGuard::kycCompletedToday($last, $today, $cursorRaw)) {
+            return $guard->skip('KYC cron', 'already completed today');
         }
 
         $registrarRow = Capsule::table('tblregistrars')
@@ -51,7 +65,7 @@ class KycCron
         }
 
         try {
-            return self::runLocked($guard);
+            return self::runLocked($guard, $today);
         } finally {
             $guard->releaseLock(CronGuard::LOCK_KYC);
         }
@@ -59,19 +73,13 @@ class KycCron
 
     /**
      * @param CronGuard $guard
+     * @param string $today
      * @return string
      */
-    private static function runLocked(CronGuard $guard)
+    private static function runLocked(CronGuard $guard, $today)
     {
         if (\function_exists('connectreseller_ensureKycSchema')) {
             \connectreseller_ensureKycSchema();
-        }
-
-        $today = date('Y-m-d', (int) $guard->now());
-        $last = $guard->get(CronGuard::KEY_KYC_LAST_RUN);
-        $cursorRaw = $guard->get(CronGuard::KEY_KYC_CURSOR);
-        if (CronGuard::kycCompletedToday($last, $today, $cursorRaw)) {
-            return $guard->skip('KYC cron', 'already completed today');
         }
 
         $guard->log('KYC Verification Email Cron started on ' . date('Y-m-d H:i:s', (int) $guard->now()));
@@ -84,7 +92,7 @@ class KycCron
             }
         }
 
-        $cursorId = (int) $cursorRaw;
+        $cursorId = (int) $guard->get(CronGuard::KEY_KYC_CURSOR);
         $remaining = CronGuard::pendingAfterCursor($pendingRows, $cursorId);
         $chunk = CronGuard::sliceChunk($remaining, 0, CronGuard::KYC_CHUNK_SIZE);
         $started = $guard->now();
