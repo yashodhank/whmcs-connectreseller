@@ -1,5 +1,7 @@
 <?php
 
+// Optional fallback. Default install uses WHMCS system cron (DailyCronJob) only.
+
 $whmcspath = '';
 
 if (file_exists(dirname(__FILE__) . '/config.php')) {

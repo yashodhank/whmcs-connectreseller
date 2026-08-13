@@ -46,4 +46,25 @@ final class ImportSmokeTest extends TestCase
         self::assertFileExists($addonHooks);
         self::assertFileExists($priceSync);
     }
+
+    public function testCronIntelligenceUsesGuardNotFullClientScan(): void
+    {
+        $kyc = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/registrars/connectreseller/lib/KycCron.php'
+        );
+        $price = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/PriceSyncTask.php'
+        );
+        $addon = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/connect_reseller.php'
+        );
+        self::assertFileExists(
+            dirname(__DIR__, 2) . '/modules/registrars/connectreseller/lib/CronGuard.php'
+        );
+        self::assertStringNotContainsString("tblclients')->get()", $kyc);
+        self::assertStringContainsString('mod_kycpending_domains', $kyc);
+        self::assertStringContainsString('KEY_PRICE_LAST_RUN', $price);
+        self::assertStringNotContainsString("strtotime(date('H:i:s'))", $price);
+        self::assertStringContainsString("'Default' => '24'", $addon);
+    }
 }

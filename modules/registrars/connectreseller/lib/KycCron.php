@@ -8,103 +8,153 @@ if (!defined('WHMCS')) {
     die('This file cannot be accessed directly');
 }
 
+require_once __DIR__ . '/CronStateStore.php';
+require_once __DIR__ . '/CapsuleCronStore.php';
+require_once __DIR__ . '/CronGuard.php';
+
 class KycCron
 {
     /**
      * Send .in KYC mail and register pending domains after verification.
-     * Gated to once per calendar day so DailyCronJob and the standalone
-     * cron script do not double-send.
+     * Scoped to mod_kycpending_domains (not all clients). Chunked with a
+     * cursor so DailyCronJob can continue the next day if the time budget
+     * is hit. Last-run day is written only after the cursor is exhausted.
      *
+     * @param CronGuard|null $guard
      * @return string
      */
-    public static function run()
+    public static function run($guard = null)
     {
-        if (!\function_exists('sendKYCverifyEmail') || !\function_exists('getRegistrantStatus')) {
-            return 'skipped';
+        if (!$guard instanceof CronGuard) {
+            $guard = new CronGuard();
         }
 
+        if (!\function_exists('sendKYCverifyEmail') || !\function_exists('getRegistrantStatus')) {
+            return $guard->skip('KYC cron', 'KYC helpers unavailable');
+        }
+
+        $registrarRow = Capsule::table('tblregistrars')
+            ->where('registrar', 'connectreseller')
+            ->where('setting', 'APIKey')
+            ->first();
+        if ($registrarRow === null) {
+            return $guard->skip('KYC cron', 'registrar inactive or missing');
+        }
+        $decrypt = \function_exists('decrypt') ? 'decrypt' : null;
+        $encrypted = isset($registrarRow->value) ? $registrarRow->value : '';
+        if (!CronGuard::registrarIsConfigured($encrypted, $decrypt)) {
+            return $guard->skip('KYC cron', 'APIKey empty');
+        }
+
+        if (!$guard->acquireLock(CronGuard::LOCK_KYC)) {
+            return $guard->skip('KYC cron', 'lock held');
+        }
+
+        try {
+            return self::runLocked($guard);
+        } finally {
+            $guard->releaseLock(CronGuard::LOCK_KYC);
+        }
+    }
+
+    /**
+     * @param CronGuard $guard
+     * @return string
+     */
+    private static function runLocked(CronGuard $guard)
+    {
         if (\function_exists('connectreseller_ensureKycSchema')) {
             \connectreseller_ensureKycSchema();
         }
 
-        $today = date('Y-m-d');
-        $last = Capsule::table('tblconfiguration')
-            ->where('setting', 'ConnectResellerKycCronLastRun')
-            ->value('value');
-        if ($last === $today) {
-            return 'skipped';
+        $today = date('Y-m-d', (int) $guard->now());
+        $last = $guard->get(CronGuard::KEY_KYC_LAST_RUN);
+        $cursorRaw = $guard->get(CronGuard::KEY_KYC_CURSOR);
+        if (CronGuard::kycCompletedToday($last, $today, $cursorRaw)) {
+            return $guard->skip('KYC cron', 'already completed today');
         }
 
-        \logActivity('KYC Verification Email Cron started on ' . date('Y-m-d H:i:s'));
+        $guard->log('KYC Verification Email Cron started on ' . date('Y-m-d H:i:s', (int) $guard->now()));
 
-        $clients = Capsule::table('tblclients')->get();
-        $field_id = Capsule::table('tblcustomfields')
-            ->where('fieldname', 'like', 'registrantContactId|%')
-            ->where('type', 'client')
-            ->value('id');
-
-        foreach ($clients as $client) {
-            try {
-                $registrantID = Capsule::table('tblcustomfieldsvalues')
-                    ->where('fieldid', $field_id)
-                    ->where('relid', $client->id)
-                    ->value('value');
-
-                if ($registrantID && $client->country == 'IN') {
-                    $result = \sendKYCverifyEmail($client->id);
-                    if (!$result) {
-                        \logActivity(
-                            "KYC email not sent for clientId {$client->id} (conditions not met or failed send)"
-                        );
-                    }
-                }
-            } catch (\Exception $e) {
-                \logActivity("KYC send failed for clientId {$client->id}. Error: " . $e->getMessage());
-                continue;
+        $pendingRows = array();
+        if (Capsule::schema()->hasTable('mod_kycpending_domains')) {
+            $fetched = Capsule::table('mod_kycpending_domains')->orderBy('id')->get();
+            foreach ($fetched as $row) {
+                $pendingRows[] = $row;
             }
         }
 
-        \logActivity('KYC Verification Email Cron completed on ' . date('Y-m-d H:i:s'));
-        \logActivity('Register domain on KYC verified, Cron started on ' . date('Y-m-d H:i:s'));
+        $cursorId = (int) $cursorRaw;
+        $remaining = CronGuard::pendingAfterCursor($pendingRows, $cursorId);
+        $chunk = CronGuard::sliceChunk($remaining, 0, CronGuard::KYC_CHUNK_SIZE);
+        $started = $guard->now();
+        $processed = 0;
+        $lastId = $cursorId;
+        $mailed = array();
 
-        $domainOrders = Capsule::table('mod_kycpending_domains')->get();
-        foreach ($domainOrders as $order) {
+        foreach ($chunk as $order) {
+            if ($guard->shouldAbort($started)) {
+                break;
+            }
+            $processed++;
+            $lastId = isset($order->id) ? (int) $order->id : $lastId;
+
+            $clientId = isset($order->client_id) ? (int) $order->client_id : 0;
+            if ($clientId < 1) {
+                continue;
+            }
+
+            $client = Capsule::table('tblclients')->where('id', $clientId)->first();
+            if ($client === null || !CronGuard::clientNeedsKyc(isset($client->country) ? $client->country : '')) {
+                continue;
+            }
+
+            if (!isset($mailed[$clientId])) {
+                try {
+                    $result = \sendKYCverifyEmail($clientId);
+                    $mailed[$clientId] = true;
+                    if (empty($result)) {
+                        $guard->log(
+                            "KYC email not sent for clientId {$clientId} (conditions not met or failed send)"
+                        );
+                    }
+                } catch (\Exception $e) {
+                    $guard->log("KYC send failed for clientId {$clientId}. Error: " . $e->getMessage());
+                }
+            }
+
             try {
-                $userid = $order->client_id;
-                $kycStatus = \getRegistrantStatus($userid);
-
+                $kycStatus = \getRegistrantStatus($clientId);
                 if (!empty($kycStatus['status']) && $kycStatus['status'] === 'Verified') {
                     $results = \localAPI('DomainRegister', array('domainid' => $order->domainid));
                     if (!isset($results['error'])) {
                         Capsule::table('mod_kycpending_domains')->where('id', $order->id)->delete();
-                        \logActivity('Domain successfully registered after KYC: ' . $order->domainname);
+                        $guard->log('Domain successfully registered after KYC: ' . $order->domainname);
                     } else {
-                        \logActivity(
+                        $guard->log(
                             'Domain registration API error for ' . $order->domainname . ': ' . $results['error']
                         );
                     }
                 }
             } catch (\Exception $e) {
-                \logActivity(
+                $guard->log(
                     'Domain Registration failed, Domain: ' . $order->domainname
                     . ', ClientId: ' . $order->client_id . '. Error: ' . $e->getMessage()
                 );
-                continue;
             }
         }
 
-        \logActivity('Register domain on KYC verified, Cron completed on ' . date('Y-m-d H:i:s'));
+        $hitBudget = $processed < count($chunk);
+        if ($hitBudget || count($remaining) > $processed) {
+            $guard->put(CronGuard::KEY_KYC_CURSOR, (string) $lastId);
+            $guard->log('KYC Verification Email Cron paused at cursor ' . $lastId);
 
-        if ($last === null) {
-            Capsule::table('tblconfiguration')->insert(array(
-                'setting' => 'ConnectResellerKycCronLastRun',
-                'value' => $today,
-            ));
-        } else {
-            Capsule::table('tblconfiguration')
-                ->where('setting', 'ConnectResellerKycCronLastRun')
-                ->update(array('value' => $today));
+            return 'in_progress';
         }
+
+        $guard->forget(CronGuard::KEY_KYC_CURSOR);
+        $guard->put(CronGuard::KEY_KYC_LAST_RUN, $today);
+        $guard->log('KYC Verification Email Cron completed on ' . date('Y-m-d H:i:s', (int) $guard->now()));
 
         return 'completed';
     }
