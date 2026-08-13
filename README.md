@@ -42,9 +42,7 @@ GitHub Releases under the MIT license.
    [GitHub Releases](https://github.com/yashodhank/whmcs-connectreseller/releases).
 2. Extract into the WHMCS root so these paths exist:
    - `modules/registrars/connectreseller/`
-   - `modules/addons/connect_reseller/`
-   - `crons/priceSync.php`
-   - `crons/kycVerification.php`
+   - `modules/addons/connect_reseller/` (optional TLD price sync)
 3. In **Setup → Products/Services → Domain Registrars**, activate
    **connectreseller**.
 4. Enter **API Key**. **Brand Id** is shown for compatibility with the vendor
@@ -52,9 +50,14 @@ GitHub Releases under the MIT license.
    reseller ID for connection tests when that field is set. **Coupon Code** is
    optional.
 5. Optionally activate the **ConnectReseller** addon for TLD price sync.
-   The WHMCS **system cron** (`cron.php`) runs price sync via `AfterCronJob`
-   (honoring the addon **Cron Frequency** hours) and `.in` KYC via
-   `DailyCronJob`. The standalone `crons/*.php` scripts are optional fallbacks.
+   The WHMCS **system cron** (`cron.php`) is the only required schedule: it
+   runs price sync via `AfterCronJob` (honoring the addon **Cron Frequency**,
+   default **24** hours) and `.in` KYC via `DailyCronJob`. Do **not** add an
+   extra crontab for `crons/*.php`.
+
+After upgrading from vendor 2.5.1 (or any zip that added `hooks.php` after the
+module was already active), re-save Domain Registrar and — if used — Addon
+Module settings so WHMCS reloads the hook cache.
 
 WHMCS already emails customers. You can disable ConnectReseller panel customer
 emails under **Settings → Panel settings → Customer Emails** to avoid duplicates.
@@ -98,17 +101,26 @@ CI runs PHP 7.4, 8.1, 8.2, and 8.3. Live API integration tests are opt-in via
 
 ## Cron
 
+**Install story: WHMCS system cron only.** Extra crontab is not required.
+
 WHMCS already runs `cron.php` (typically every five minutes, with a daily
-pass). This fork hooks that schedule:
+pass). This fork hooks that schedule. Jobs skip when the registrar is inactive
+or the API key is empty, take a TTL lock so DailyCronJob and leftover
+`crons/*.php` cannot overlap, and process work in time-budgeted chunks.
 
 | Hook | When | Job |
 |------|------|-----|
-| Addon `AfterCronJob` | Every system cron, gated by **Cron Frequency** (hours) | TLD price sync |
+| Addon `AfterCronJob` | Every system cron, gated by **Cron Frequency** (hours, default 24) | TLD price sync |
 | Registrar `DailyCronJob` | Once per day | `.in` KYC mail + register pending domains |
 
-Standalone scripts remain for hosts that cannot rely on hooks (or for a one-off
-run). Do **not** also crontab them if the WHMCS system cron is active, or jobs
-may run twice (KYC is additionally gated to once per calendar day).
+`.in` KYC is scoped to clients with rows in `mod_kycpending_domains` (Indian
+clients with pending `.in` domains). It does not iterate every WHMCS client.
+
+### Legacy fallback
+
+Standalone scripts remain for hosts that cannot load module `hooks.php`, or for
+a one-off run. They call the same guarded tasks. Do **not** crontab them when
+the WHMCS system cron is active.
 
 | File | Role |
 |------|------|
@@ -116,7 +128,8 @@ may run twice (KYC is additionally gated to once per calendar day).
 | `crons/kycVerification.php` | Optional fallback: same KYC job as `DailyCronJob` (renamed from vendor `kycVerfication.php`) |
 
 Point `$whmcspath` in a sibling `crons/config.php` if the WHMCS root is not the
-parent of `crons/`.
+parent of `crons/`. The release zip may still include `crons/`; extracting or
+running those scripts is not required.
 
 ## License
 

@@ -57,4 +57,18 @@ TLD-sync addon. Vendor identity was 2.5.1.
 - `.in` KYC detection no longer matches TLDs that merely end in `in` (e.g. `.berlin`).
 - Price sync and KYC run from the WHMCS system cron (`AfterCronJob` / `DailyCronJob`); standalone `crons/` scripts are optional.
 
+### Cron
+
+- Skip KYC when the registrar is inactive or `APIKey` is empty; skip price sync
+  when the addon is disabled or credentials are missing.
+- `CronGuard` takes a `tblconfiguration` compare-and-set lock (1 hour TTL) so
+  DailyCronJob, AfterCronJob, and leftover `crons/*.php` cannot overlap.
+- Price sync last-run is a unix timestamp (`ConnectResellerPriceSyncLastRun`),
+  not `mod_cron_status.time` (`TIME` / `H:i:s`). Empty **Cron Frequency**
+  defaults to 24 hours.
+- KYC iterates `mod_kycpending_domains` (Indian clients with pending `.in`
+  domains), not every row in `tblclients`.
+- Both jobs chunk work and persist a cursor so AfterCronJob / DailyCronJob stay
+  inside a PHP time budget.
+
 [3.0.0]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.0
