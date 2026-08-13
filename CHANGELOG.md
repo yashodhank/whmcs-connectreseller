@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.3] - 2026-08-13
+
+Sync TLDs table stayed empty while a red growl dumped the DataTables JSON
+(`recordsTotal`, `status: true`). v3.0.2 only stopped mislabeling HTML as an
+API-key error; it still growled `xhr.responseText` when DataTables hit
+`parsererror` (WHMCS wrapping / invalid JSON) or when `message` was empty.
+
+### Fixed
+
+- DataTables AJAX parses the body as text, recovers a `data` array even on
+  HTTP/parse errors, and never growls the raw JSON payload.
+- `domainTable` cells are well-formed escaped HTML; JSON uses
+  `JSON_UNESCAPED_UNICODE`. AJAX replies discard output buffers and send
+  `Content-Type: application/json` before exit.
+
+### Changed
+
+- Module / addon version is **3.0.3**.
+
+[3.0.3]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.3
+
 ## [3.0.2] - 2026-08-13
 
 Addon Sync/Automation AJAX must return JSON on errors; CSRF must not wrap

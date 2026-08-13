@@ -6,7 +6,7 @@
 
 connectreseller.com WHMCS Registrar plug-in is an open-source plug-in that is
 distributed free of charge. This repository is a community-maintained fork
-(current module version **3.0.2**). It focuses on integrating ConnectReseller as
+(current module version **3.0.3**). It focuses on integrating ConnectReseller as
 a domain registrar at WHMCS.
 
 After the integration you can setup ConnectReseller as the default registrar for
