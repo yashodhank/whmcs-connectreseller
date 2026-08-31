@@ -60,9 +60,12 @@ class PriceSyncTask
         $inProgress = $cursorRaw !== null && $cursorRaw !== '';
         $lastRun = (int) $guard->get(CronGuard::KEY_PRICE_LAST_RUN);
 
-        // Frequency / idle check before taking the lock.
+        // Frequency / idle check before taking the lock. This is the common case
+        // on every AfterCronJob tick (~every 5 min); logging it floods the WHMCS
+        // Activity Log ("price sync skipped: frequency not elapsed") and reads as a
+        // recurring failure. Skip silently — real skips below still log.
         if (!$inProgress && !CronGuard::frequencyElapsed($lastRun, $guard->now(), $hours)) {
-            return $guard->skip('price sync', 'frequency not elapsed');
+            return 'skipped';
         }
 
         if (!$guard->acquireLock(CronGuard::LOCK_PRICE)) {
