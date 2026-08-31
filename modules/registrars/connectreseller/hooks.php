@@ -85,12 +85,17 @@ if (isset($whmcs) && is_object($whmcs) && $whmcs->get_req_var('formAction') === 
         $userid = $whmcs->get_req_var('userId');
         $sendEmail = sendKYCverifyEmail($userid);
 
-        if($sendEmail['status'] === 'emailSend') {
-            echo json_encode(['status'  => 'success', 'message' => 'Email has been sent successfully.']);
-        } elseif($sendEmail['status'] == 'statusUpdated') {
-            echo json_encode(['status'  => 'updated', 'message' => 'KYC Email Verification has been done by the client.']);
+        // sendKYCverifyEmail always returns ['status','message']; surface the real
+        // reason so the admin sees "not provisioned"/"API rejected" not a blanket error.
+        $resultStatus = is_array($sendEmail) && isset($sendEmail['status']) ? $sendEmail['status'] : 'error';
+        $resultMessage = is_array($sendEmail) && !empty($sendEmail['message']) ? $sendEmail['message'] : '';
+
+        if ($resultStatus === 'emailSend') {
+            echo json_encode(['status' => 'success', 'message' => $resultMessage !== '' ? $resultMessage : 'Email has been sent successfully.']);
+        } elseif ($resultStatus === 'statusUpdated') {
+            echo json_encode(['status' => 'updated', 'message' => $resultMessage !== '' ? $resultMessage : 'KYC Email Verification has been done by the client.']);
         } else {
-            echo json_encode(['status'  => 'error', 'message' => 'Failed to send email.']);
+            echo json_encode(['status' => 'error', 'message' => $resultMessage !== '' ? $resultMessage : 'Failed to send email.']);
         }
 
     } catch(Exception $e) {
@@ -500,45 +505,178 @@ function addReseller($vars, $newclient = null) {
 }
 
 /**
- * Send Email verification Email 
+ * Send the KYC verification email for a client.
+ *
+ * Always returns a structured array: ['status' => <emailSend|statusUpdated|error>,
+ * 'message' => <human-readable reason>]. Never returns null, so callers can rely
+ * on the shape and surface a precise reason instead of a blanket failure.
  */
 function sendKYCverifyEmail($uid) {
     try {
+        $uid = (int) $uid;
 
-        // retrive the registrant KYC verification status
+        // Retrieve the registrant KYC verification status (normalized shape).
         $viewRegistrantStatus = getRegistrantStatus($uid);
 
-        if($viewRegistrantStatus['status'] == "Verified") {
-            return ["status" => "statusUpdated", "message" => "The KYC verification had beed verified by the user."];
-        } else {
-            $kyc_sendData = [
-                'registrantContactId' => $viewRegistrantStatus['registrant_id']
-            ];
-            // Curl Call for sendKYCMail
-            $sendEmail = callCurl("GET", $kyc_sendData, "sendKYCMail");
-            if(!empty($sendEmail['status_code']) && $sendEmail['status_code'] === 200) {
-                return ["status" => "emailSend", "message" => "The KYC verification email has beed sent to client: #{$uid}."];
-            }
+        // Could not even resolve the registrant contact — do not attempt a send
+        // with an empty registrantContactId (that produces a broken CR request).
+        if (empty($viewRegistrantStatus['registrant_id'])) {
+            $reason = !empty($viewRegistrantStatus['error'])
+                ? $viewRegistrantStatus['error']
+                : 'Registrant contact is not provisioned for this client in ConnectReseller.';
+
+            return ["status" => "error", "message" => $reason];
         }
 
+        if (isset($viewRegistrantStatus['status']) && $viewRegistrantStatus['status'] === "Verified") {
+            return ["status" => "statusUpdated", "message" => "The KYC verification has already been completed by the user."];
+        }
+
+        $kyc_sendData = [
+            'registrantContactId' => $viewRegistrantStatus['registrant_id']
+        ];
+        // Curl Call for sendKYCMail
+        $sendEmail = callCurl("GET", $kyc_sendData, "sendKYCMail");
+
+        if (empty($sendEmail['status_code']) || (int) $sendEmail['status_code'] !== 200) {
+            $reason = !empty($sendEmail['error'])
+                ? 'ConnectReseller did not accept the KYC email request: ' . $sendEmail['error']
+                : 'ConnectReseller did not accept the KYC email request.';
+
+            return ["status" => "error", "message" => $reason];
+        }
+
+        // HTTP 200 can still carry a body-level (logical) error. Check it.
+        $sendData = !empty($sendEmail['response']) ? json_decode($sendEmail['response'], true) : null;
+        $apiStatus = isset($sendData['responseMsg']['statusCode']) ? (int) $sendData['responseMsg']['statusCode'] : 200;
+        if ($apiStatus !== 200) {
+            $apiMsg = isset($sendData['responseMsg']['message']) ? $sendData['responseMsg']['message'] : 'unknown error';
+
+            return ["status" => "error", "message" => 'ConnectReseller rejected the KYC email request: ' . $apiMsg];
+        }
+
+        return ["status" => "emailSend", "message" => "The KYC verification email has been sent to client #{$uid}."];
+
     } catch(Exception $e) {
-        logActivity("Unable to send the KYC Email for clientId #{$uid}". $e->getMessage());
+        logActivity("Unable to send the KYC Email for clientId #{$uid}: ". $e->getMessage());
+
+        return ["status" => "error", "message" => 'Failed to send email: ' . $e->getMessage()];
     }
 }
 
 /**
- * Get Reseller client KYC Email verification status
+ * Local registrantContactId for a WHMCS client (custom field value), or null.
+ */
+function connectreseller_registrantContactId($uid) {
+    $field_id = Capsule::table('tblcustomfields')
+        ->where('fieldname', 'like', 'registrantContactId|%')
+        ->where('type', 'client')
+        ->value('id');
+    if (!$field_id) {
+        return null;
+    }
+
+    return Capsule::table('tblcustomfieldsvalues')
+        ->where("fieldid", $field_id)
+        ->where("relid", (int) $uid)
+        ->value("value");
+}
+
+/**
+ * Resolve a client's ConnectReseller registrantContactId when it was never
+ * stored locally (client pre-existed in CR or was imported), and persist it.
+ *
+ * Uses the same lookups addReseller() relies on: ViewClient (by email) to find
+ * the CR customer, then DefaultRegistrantContact to read its registrant id.
+ * Best-effort and defensive — returns null (not an exception) on any mismatch.
+ */
+function connectreseller_backfillRegistrantId($uid) {
+    try {
+        $uid = (int) $uid;
+        $client = Capsule::table('tblclients')->where('id', $uid)->first();
+        if ($client === null || empty($client->email)) {
+            return null;
+        }
+
+        // 1) Find the ConnectReseller customer by email.
+        $view = callCurl("GET", ['UserName' => $client->email], "ViewClient");
+        if (empty($view['status_code']) || (int) $view['status_code'] !== 200 || empty($view['response'])) {
+            return null;
+        }
+        $viewData = json_decode($view['response'], true);
+        if (!isset($viewData['responseMsg']['statusCode']) || (int) $viewData['responseMsg']['statusCode'] !== 200) {
+            return null; // client does not exist in ConnectReseller
+        }
+        $responseData = isset($viewData['responseData']) && is_array($viewData['responseData']) ? $viewData['responseData'] : [];
+        $crClientId = null;
+        foreach (['clientId', 'clientID', 'ClientId', 'id', 'Id'] as $key) {
+            if (!empty($responseData[$key])) {
+                $crClientId = $responseData[$key];
+                break;
+            }
+        }
+        if (!$crClientId) {
+            return null;
+        }
+
+        // 2) Read the default registrant contact id for that customer.
+        $default = callCurl("GET", ['Id' => $crClientId], "DefaultRegistrantContact");
+        if (empty($default['status_code']) || (int) $default['status_code'] !== 200 || empty($default['response'])) {
+            return null;
+        }
+        $defaultData = json_decode($default['response'], true);
+        $registrantId = $defaultData['responseData']['registrantContactId'] ?? null;
+        if (!$registrantId) {
+            return null;
+        }
+
+        // 3) Persist locally so future lookups are cheap and consistent.
+        connectreseller_ensureKycSchema();
+        $field_id = Capsule::table('tblcustomfields')
+            ->where('fieldname', 'like', 'registrantContactId|%')
+            ->where('type', 'client')
+            ->value('id');
+        if ($field_id) {
+            Capsule::table('tblcustomfieldsvalues')->updateOrInsert(
+                ['fieldid' => $field_id, 'relid' => $uid],
+                ['value' => $registrantId]
+            );
+        }
+
+        return $registrantId;
+    } catch (Exception $e) {
+        logActivity("ConnectReseller KYC backfill failed for clientId #{$uid}: " . $e->getMessage());
+
+        return null;
+    }
+}
+
+/**
+ * Get a Reseller client's KYC verification status.
+ *
+ * Always returns a normalized array with 'status', 'registrant_id' and (on
+ * failure) 'error' keys, so callers never dereference undefined offsets or null.
  */
 function getRegistrantStatus($uid) {
     try {
+        $uid = (int) $uid;
+        $registrantID = connectreseller_registrantContactId($uid);
 
-        $field_id = Capsule::table('tblcustomfields')->where('fieldname', 'like', 'registrantContactId|%')->where('type', 'client')->value('id');
-        $registrantID =  Capsule::table('tblcustomfieldsvalues')->where("fieldid", $field_id)->where("relid", $uid)->value("value");
+        // Self-heal: registrantContactId is only written when addReseller() runs.
+        // Clients that already existed in ConnectReseller never got it, so resolve
+        // it from CR now (this is what makes the manual "Send Email" button work
+        // for pre-existing/imported clients such as the ones on the summary page).
+        if (!$registrantID) {
+            $registrantID = connectreseller_backfillRegistrantId($uid);
+        }
 
-        if(!$registrantID) {
-            logActivity("No registrantID found for clientId {$uid}");
+        if (!$registrantID) {
+            logActivity("ConnectReseller KYC: no registrantContactId for clientId {$uid} (not provisioned in ConnectReseller)");
+
             return [
-                'error' => 'No registrantID found for this client'
+                'status' => null,
+                'registrant_id' => null,
+                'error' => 'Registrant contact is not provisioned for this client in ConnectReseller.',
             ];
         }
 
@@ -548,26 +686,50 @@ function getRegistrantStatus($uid) {
         // Curl Call for ViewRegistrant
         $viewRegistrantStatus = callCurl("GET", $status_data, "ViewRegistrant");
 
-        if($viewRegistrantStatus['status_code'] == 200) {
-            $registrantData = json_decode($viewRegistrantStatus['response'], true);
-            $rawStatus = $registrantData['responseData']['kycStatus'] ?? null;
-            if ($rawStatus === true) {
-                $registrant_status = "Verified"; 
-            } elseif (empty($rawStatus) || $rawStatus === false) { 
-                $registrant_status = "Not Verified"; 
-            } else {
-                $registrant_status = (string) $rawStatus; 
-            }
+        if (empty($viewRegistrantStatus['status_code']) || (int) $viewRegistrantStatus['status_code'] !== 200) {
+            $reason = !empty($viewRegistrantStatus['error'])
+                ? 'Unable to reach ConnectReseller to read KYC status: ' . $viewRegistrantStatus['error']
+                : 'Unable to reach ConnectReseller to read KYC status.';
 
             return [
-                "status" => $registrant_status,
-                "registrant_id" => $registrantID
+                'status' => null,
+                'registrant_id' => $registrantID,
+                'error' => $reason,
             ];
         }
 
+        $registrantData = json_decode($viewRegistrantStatus['response'], true);
+        $apiStatus = isset($registrantData['responseMsg']['statusCode']) ? (int) $registrantData['responseMsg']['statusCode'] : 200;
+        if ($apiStatus !== 200) {
+            return [
+                'status' => null,
+                'registrant_id' => $registrantID,
+                'error' => 'ConnectReseller rejected the KYC status lookup (code ' . $apiStatus . ').',
+            ];
+        }
+
+        $rawStatus = $registrantData['responseData']['kycStatus'] ?? null;
+        if ($rawStatus === true) {
+            $registrant_status = "Verified";
+        } elseif (empty($rawStatus) || $rawStatus === false) {
+            $registrant_status = "Not Verified";
+        } else {
+            $registrant_status = (string) $rawStatus;
+        }
+
+        return [
+            "status" => $registrant_status,
+            "registrant_id" => $registrantID
+        ];
 
     } catch(Exception $e) {
         logActivity("Error to get client registrant KYC status. Error: ".$e->getMessage());
+
+        return [
+            'status' => null,
+            'registrant_id' => null,
+            'error' => $e->getMessage(),
+        ];
     }
 }
 
@@ -599,6 +761,7 @@ function callCurl($method, $data, $action)
     } catch (\Exception $e) {
         return array(
             'status_code' => 500,
+            'response' => '',
             'error' => $e->getMessage(),
         );
     }

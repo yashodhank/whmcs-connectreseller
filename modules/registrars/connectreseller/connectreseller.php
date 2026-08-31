@@ -22,7 +22,7 @@ use WHMCS\Domain\TopLevel\ImportItem;
 use WHMCS\Database\Capsule;
 
 if (!defined('CONNECTRESELLER_MODULE_VERSION')) {
-    define('CONNECTRESELLER_MODULE_VERSION', '3.0.3');
+    define('CONNECTRESELLER_MODULE_VERSION', '3.0.4');
 }
 
 $apiUrl = "https://api.connectreseller.com/ConnectReseller/";
