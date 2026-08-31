@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.4] - 2026-08-31
+
+KYC verification email now works for clients that already existed in
+ConnectReseller (or were imported), and the WHMCS Activity Log is no longer
+flooded with benign "KYC cron skipped" entries on every system cron tick.
+
+### Fixed
+
+- `sendKYCverifyEmail()` always returns `['status','message']` (never `null`),
+  checks both the HTTP status and the CR body-level `responseMsg.statusCode`,
+  and refuses to send with an empty `registrantContactId`. The admin "Send
+  Email" button now surfaces the real reason instead of a blanket failure.
+- `getRegistrantStatus()` returns a normalized `['status','registrant_id',
+  'error']` shape and self-heals a missing `registrantContactId` by resolving
+  it from ConnectReseller (`ViewClient` → `DefaultRegistrantContact`) and
+  persisting it — the root cause of "Send Email" failing for pre-existing
+  clients on the client summary page.
+- KYC cron: the two benign, high-frequency skips (`no in-progress cursor`,
+  `already completed today`) return silently instead of writing to the Activity
+  Log on every `AfterCronJob`/`DailyCronJob` tick. Genuine skips still log.
+- The cron now records the precise per-client reason a KYC email was not sent.
+- `callCurl()` error return includes a `response` key for consistent decoding.
+
+### Changed
+
+- Module / addon version is **3.0.4**.
+
+[3.0.4]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.4
+
 ## [3.0.3] - 2026-08-13
 
 Sync TLDs table stayed empty while a red growl dumped the DataTables JSON

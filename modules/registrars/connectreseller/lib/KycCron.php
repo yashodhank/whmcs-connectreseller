@@ -39,12 +39,17 @@ class KycCron
         $cursorRaw = $guard->get(CronGuard::KEY_KYC_CURSOR);
         $inProgress = $cursorRaw !== null && $cursorRaw !== '';
 
+        // Benign, high-frequency skips must NOT write to the WHMCS Activity Log.
+        // AfterCronJob fires on every system cron tick (~every 5 min); logging a
+        // skip there floods the log with "ConnectReseller KYC cron skipped" and
+        // reads to operators as a recurring failure. Return silently instead.
+        // (Genuinely informative skips below still go through $guard->skip().)
         if ($continueOnly && !$inProgress) {
-            return $guard->skip('KYC cron', 'no in-progress cursor');
+            return 'skipped';
         }
 
         if (CronGuard::kycCompletedToday($last, $today, $cursorRaw)) {
-            return $guard->skip('KYC cron', 'already completed today');
+            return 'skipped';
         }
 
         $registrarRow = Capsule::table('tblregistrars')
@@ -121,10 +126,12 @@ class KycCron
                 try {
                     $result = \sendKYCverifyEmail($clientId);
                     $mailed[$clientId] = true;
-                    if (empty($result)) {
-                        $guard->log(
-                            "KYC email not sent for clientId {$clientId} (conditions not met or failed send)"
-                        );
+                    $sentStatus = is_array($result) && isset($result['status']) ? $result['status'] : '';
+                    if ($sentStatus !== 'emailSend' && $sentStatus !== 'statusUpdated') {
+                        $reason = is_array($result) && !empty($result['message'])
+                            ? $result['message']
+                            : 'conditions not met or send failed';
+                        $guard->log("KYC email not sent for clientId {$clientId}: {$reason}");
                     }
                 } catch (\Exception $e) {
                     $guard->log("KYC send failed for clientId {$clientId}. Error: " . $e->getMessage());
