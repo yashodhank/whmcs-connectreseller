@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.5] - 2026-09-06
+
+Addon admin failures must stay visible in WHMCS, and missing admin JS
+dependencies must degrade into explicit notices instead of blank or broken
+pages.
+
+### Fixed
+
+- `connect_reseller_output()` now renders an admin-visible danger alert when
+  addon page dispatch fails, instead of returning an error array that WHMCS
+  discards.
+- Admin AJAX responses now go through one buffer-safe JSON emitter path for
+  DataTables and non-DataTables actions, so toggle/import/manual-sync failures
+  no longer depend on mixed `sendResponse()` behavior.
+- Admin tab links are built from a cleaned base module URL, avoiding duplicate
+  or stale `action=` query strings in navigation and AJAX routing.
+- Addon JS checks for missing DataTables / tooltip dependencies and surfaces an
+  in-page alert instead of throwing during page boot.
+
+### Changed
+
+- Module / addon version is **3.0.5**.
+
+[3.0.5]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.5
+
 ## [3.0.4] - 2026-08-31
 
 KYC verification email now works for clients that already existed in

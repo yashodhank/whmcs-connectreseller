@@ -74,6 +74,9 @@ final class AddonDataTablesResponseTest extends TestCase
         self::assertStringContainsString('dataType: "text"', $js);
         self::assertStringContainsString('parseAjaxPayload', $js);
         self::assertStringContainsString('$.isArray(json.data)', $js);
+        self::assertStringContainsString('function requireDataTables(featureName)', $js);
+        self::assertStringContainsString('WHMCS DataTables dependency did not load', $js);
+        self::assertStringContainsString('window.bootstrap.Tooltip', $js);
     }
 
     public function testDomainTableRowJsonIsDecodableAndCellsAreWellFormed(): void
@@ -141,11 +144,27 @@ final class AddonDataTablesResponseTest extends TestCase
             dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/Admin/Controller.php'
         );
         self::assertStringContainsString('private function emitJson($body)', $src);
+        self::assertStringContainsString('private function emitJsonResponse($status, $message, array $extra = array())', $src);
+        self::assertStringContainsString('private function emitDataTablesError($draw, $message, $recordsTotal = 0, $recordsFiltered = 0)', $src);
         self::assertStringContainsString('requireAdminToken(true, $draw)', $src);
         self::assertStringContainsString('Sync TLDs failed:', $src);
         self::assertStringContainsString('hash_equals($expected, $token)', $src);
-        self::assertStringContainsString("action=' . rawurlencode(\$action)", $src);
+        self::assertStringContainsString('stripActionFromModuleLink', $src);
+        self::assertStringContainsString('enabledisableLink', $src);
         self::assertStringContainsString('ob_end_clean()', $src);
         self::assertStringContainsString("header('Content-Type: application/json; charset=utf-8')", $src);
+        self::assertStringNotContainsString("sendResponse(false, 'Toggle failed:", $src);
+        self::assertStringNotContainsString("sendResponse(false, 'Import failed:", $src);
+    }
+
+    public function testAddonOutputRendersAdminErrorInsteadOfReturningArray(): void
+    {
+        $src = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/connect_reseller.php'
+        );
+        self::assertStringContainsString('function connect_reseller_render_admin_error(\\Throwable $e)', $src);
+        self::assertStringContainsString('ConnectReseller addon failed to load.', $src);
+        self::assertStringContainsString('catch (\\Throwable $e)', $src);
+        self::assertStringNotContainsString("return ['status' => \"error\", 'description' => 'Unable to Showing addon module:", $src);
     }
 }

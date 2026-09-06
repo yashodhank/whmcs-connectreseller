@@ -2,9 +2,52 @@ $(document).ready(function () {
     var addonCfg = window.ConnectResellerAddon || {};
     var moduleUrl = addonCfg.moduleLink || window.location.href.split("#")[0];
     var csrfToken = addonCfg.token || "";
+    var dependencyWarnings = {};
 
     if ($.fn.dataTable && $.fn.dataTable.ext) {
         $.fn.dataTable.ext.errMode = "none";
+    }
+
+    function ensureAdminAlertHost() {
+        var $host = $(".connectreseller-admin-alerts");
+        if ($host.length) {
+            return $host.first();
+        }
+        $host = $('<div class="connectreseller-admin-alerts"></div>');
+        var $target = $(".container-box").first();
+        if ($target.length) {
+            $host.insertBefore($target);
+        } else {
+            $("body").prepend($host);
+        }
+        return $host;
+    }
+
+    function showAdminAlert(level, message) {
+        var safeLevel = level === "success" ? "success" : (level === "warning" ? "warning" : "danger");
+        var key = safeLevel + "::" + String(message || "");
+        if (dependencyWarnings[key]) {
+            return;
+        }
+        dependencyWarnings[key] = 1;
+        ensureAdminAlertHost().append(
+            $('<div class="alert alert-' + safeLevel + '" role="alert"></div>').text(message || "Unexpected error")
+        );
+    }
+
+    function hasDataTables() {
+        return !!($.fn && $.fn.DataTable && $.fn.DataTable.isDataTable);
+    }
+
+    function requireDataTables(featureName) {
+        if (hasDataTables()) {
+            return true;
+        }
+        showAdminAlert(
+            "danger",
+            featureName + " is unavailable because the WHMCS DataTables dependency did not load. Reload the page and confirm the admin theme still includes DataTables assets."
+        );
+        return false;
     }
 
     function withCsrf(data) {
@@ -16,6 +59,9 @@ $(document).ready(function () {
     }
 
     function hideProcessing($table) {
+        if (!hasDataTables()) {
+            return;
+        }
         var $wrap = $table.closest(".dataTables_wrapper");
         $wrap.find("div.dataTables_processing").hide();
         try {
@@ -229,6 +275,11 @@ $(document).ready(function () {
             return;
         }
 
+        if (!requireDataTables("Sync TLDs")) {
+            $(".domain-table").show();
+            return;
+        }
+
         if ($.fn.DataTable.isDataTable("#domainTable")) {
             $("#domainTable").DataTable().clear().destroy();
         }
@@ -273,6 +324,10 @@ $(document).ready(function () {
 
     function enableDisableDatatable(ajaxCallFor) {
         if (!hasTldTable) {
+            return;
+        }
+
+        if (!requireDataTables("TLD Automation")) {
             return;
         }
 
@@ -467,6 +522,17 @@ $(document).ready(function () {
     });
 
     if ($("[data-bs-toggle='tooltip']").length) {
-        $("[data-bs-toggle='tooltip']").tooltip();
+        if ($.fn && typeof $.fn.tooltip === "function") {
+            $("[data-bs-toggle='tooltip']").tooltip();
+        } else if (window.bootstrap && typeof window.bootstrap.Tooltip === "function") {
+            $("[data-bs-toggle='tooltip']").each(function () {
+                new window.bootstrap.Tooltip(this);
+            });
+        } else {
+            showAdminAlert(
+                "warning",
+                "Help tooltips are unavailable because the Bootstrap tooltip plugin did not load."
+            );
+        }
     }
 });

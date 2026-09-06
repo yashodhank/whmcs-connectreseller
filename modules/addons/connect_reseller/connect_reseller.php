@@ -29,7 +29,7 @@ function connect_reseller_config()
         'description' =>  $lang["addon_desc"],
         'author' => '<a href="https://www.connectreseller.com/" target="_blank"><img src="/modules/addons/connect_reseller/assets/images/logo.svg" alt="ConnectReseller"  width="150"></a>',
         'language' => 'english',
-        'version' => '3.0.4',
+        'version' => '3.0.5',
         'fields' => [
             'margin' => [
                 'FriendlyName' => 'Domain Margin',
@@ -83,15 +83,40 @@ function connect_reseller_deactivate()
         return ['status' => "error", 'description' => 'Unable to deactivate module: ' . $e->getMessage(),];
     }
 }
+
+/**
+ * Render an actionable admin-visible addon error instead of silently returning
+ * an array that WHMCS will ignore on addon output failures.
+ *
+ * @param \Throwable $e
+ * @return void
+ */
+function connect_reseller_render_admin_error(\Throwable $e)
+{
+    if (!headers_sent()) {
+        http_response_code(500);
+    }
+
+    $message = htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+
+    echo '<div class="alert alert-danger" role="alert">'
+        . '<strong>ConnectReseller addon failed to load.</strong><br>'
+        . $message . '<br>'
+        . 'Reload the page after fixing the module configuration or check the WHMCS module/activity logs for the underlying PHP error.'
+        . '</div>';
+}
+
 function connect_reseller_output($vars)
 {
     try {
-        $helper = new Helper($vars);
         $whmcs = WHMCS\Application::getInstance();
         $action = !empty($whmcs->get_req_var("action")) ? $whmcs->get_req_var("action") : 'domainsync';
         $dispatcher = new AdminDispatcher($vars);
-        $dispatcher->dispatch($action, $vars);
-    } catch (\Exception $e) {
-        return ['status' => "error", 'description' => 'Unable to Showing addon module: ' . $e->getMessage(),];
+        $output = $dispatcher->dispatch($action, $vars);
+        if (is_string($output) && $output !== '') {
+            echo $output;
+        }
+    } catch (\Throwable $e) {
+        connect_reseller_render_admin_error($e);
     }
 }

@@ -21,6 +21,18 @@ final class WhmcsContractTest extends TestCase
         self::assertStringNotContainsString("'APIVersion' => '2.5.1'", $source);
     }
 
+    public function testAddonVersionWasBumpedForAdminFixes(): void
+    {
+        $addon = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/connect_reseller.php'
+        );
+        $controller = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/Admin/Controller.php'
+        );
+        self::assertStringContainsString("'version' => '3.0.5'", $addon);
+        self::assertStringContainsString("private const MODULE_VERSION = '3.0.5';", $controller);
+    }
+
     public function testFundsResponseAcceptsStatusZero(): void
     {
         $fixture = json_decode(

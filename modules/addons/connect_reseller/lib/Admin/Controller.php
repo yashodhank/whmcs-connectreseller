@@ -14,6 +14,8 @@ use Smarty;
 
 class Controller
 {
+    private const MODULE_VERSION = '3.0.5';
+
     public $params = [];
     public $tplDIR;
     public $lang;
@@ -27,24 +29,18 @@ class Controller
         $this->tplVar['rootURL'] = $CONFIG["SystemURL"];
         $this->tplVar['urlPath'] = $CONFIG["SystemURL"] . "/modules/addons/{$params['module']}/";
         $this->tplVar['lang'] = $params["_lang"];
-        // Keep current admin tab in moduleLink so DataTables AJAX posts hit the
-        // same controller action (Automation is not the default domainsync route).
         $moduleLink = isset($params['modulelink']) ? (string) $params['modulelink'] : '';
+        $moduleBaseLink = $this->stripActionFromModuleLink($moduleLink);
         global $whmcs;
         $action = '';
         if ($whmcs && method_exists($whmcs, 'get_req_var')) {
             $action = (string) $whmcs->get_req_var('action');
         }
-        if (
-            $action !== ''
-            && $action !== 'domainsync'
-            && $moduleLink !== ''
-            && strpos($moduleLink, 'action=') === false
-        ) {
-            $moduleLink .= (strpos($moduleLink, '?') !== false ? '&' : '?')
-                . 'action=' . rawurlencode($action);
-        }
+        $moduleLink = $this->buildActionLink($moduleBaseLink, $action);
         $this->tplVar['moduleLink'] = $moduleLink;
+        $this->tplVar['moduleBaseLink'] = $moduleBaseLink;
+        $this->tplVar['domainsyncLink'] = $this->buildActionLink($moduleBaseLink, 'domainsync');
+        $this->tplVar['enabledisableLink'] = $this->buildActionLink($moduleBaseLink, 'enabledisable');
         $this->tplVar['module'] = $params['module'];
         $this->tplVar['tplDIR'] = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/";
         $this->tplVar['header'] = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/header.tpl";
@@ -53,7 +49,38 @@ class Controller
         $this->tplVar['csrfToken'] = function_exists('generate_token')
             ? generate_token('plain')
             : '';
-        $this->tplVar['moduleVersion'] = '3.0.3';
+        $this->tplVar['moduleVersion'] = self::MODULE_VERSION;
+    }
+
+    /**
+     * @param string $moduleLink
+     * @return string
+     */
+    private function stripActionFromModuleLink($moduleLink)
+    {
+        $clean = preg_replace('/([?&])action=[^&]*(&)?/', '$1', (string) $moduleLink);
+        $clean = preg_replace('/[?&]$/', '', (string) $clean);
+        $clean = str_replace('?&', '?', (string) $clean);
+
+        return (string) $clean;
+    }
+
+    /**
+     * @param string $moduleBaseLink
+     * @param string $action
+     * @return string
+     */
+    private function buildActionLink($moduleBaseLink, $action)
+    {
+        $moduleBaseLink = (string) $moduleBaseLink;
+        $action = (string) $action;
+        if ($moduleBaseLink === '' || $action === '' || $action === 'domainsync') {
+            return $moduleBaseLink;
+        }
+
+        return $moduleBaseLink
+            . (strpos($moduleBaseLink, '?') !== false ? '&' : '?')
+            . 'action=' . rawurlencode($action);
     }
 
     /**
@@ -88,6 +115,43 @@ class Controller
     }
 
     /**
+     * @param bool $status
+     * @param string $message
+     * @param array $extra
+     * @return void
+     */
+    private function emitJsonResponse($status, $message, array $extra = array())
+    {
+        $helper = new Helper();
+        $payload = array_merge(array(
+            'status' => (bool) $status,
+            'message' => (string) $message,
+        ), $extra);
+
+        $this->emitJson($helper->encodeJson($payload));
+    }
+
+    /**
+     * @param int $draw
+     * @param string $message
+     * @param int $recordsTotal
+     * @param int $recordsFiltered
+     * @return void
+     */
+    private function emitDataTablesError($draw, $message, $recordsTotal = 0, $recordsFiltered = 0)
+    {
+        $helper = new Helper();
+        $this->emitJson($helper->dataTablesPayload(
+            (int) $draw,
+            array(),
+            false,
+            (string) $message,
+            (int) $recordsTotal,
+            (int) $recordsFiltered
+        ));
+    }
+
+    /**
      * Verify admin CSRF. AJAX uses non-fatal hash_equals so failures return JSON
      * instead of WHMCS HTML from check_token()/die().
      *
@@ -106,15 +170,14 @@ class Controller
             }
             $expected = function_exists('generate_token') ? (string) generate_token('plain') : '';
             if ($expected === '' || $token === '' || !hash_equals($expected, $token)) {
-                $helper = new Helper();
-                $this->emitJson($helper->dataTablesPayload(
-                    $draw !== null ? (int) $draw : $this->requestDraw(),
-                    array(),
-                    false,
-                    'Invalid CSRF token. Reload the page and try again.',
-                    0,
-                    0
-                ));
+                if ($draw !== null) {
+                    $this->emitDataTablesError(
+                        (int) $draw,
+                        'Invalid CSRF token. Reload the page and try again.'
+                    );
+                }
+
+                $this->emitJsonResponse(false, 'Invalid CSRF token. Reload the page and try again.');
             }
 
             return;
@@ -210,14 +273,10 @@ class Controller
                     $this->requireAdminToken(true, $draw);
                     $this->emitJson($helper->tldsList($_POST));
                 } catch (\Exception $e) {
-                    $this->emitJson($helper->dataTablesPayload(
+                    $this->emitDataTablesError(
                         $this->requestDraw(),
-                        array(),
-                        false,
-                        'Automation list failed: ' . $e->getMessage(),
-                        0,
-                        0
-                    ));
+                        'Automation list failed: ' . $e->getMessage()
+                    );
                 }
             }
 
@@ -225,7 +284,7 @@ class Controller
                 try {
                     $this->requireAdminToken(true);
                     if (empty($whmcs->get_req_var("tld"))) {
-                        $helper->sendResponse(false, 'Something Went Wrong');
+                        $this->emitJsonResponse(false, 'Missing TLD identifier.');
                     }
 
                     $data = ['status' => $whmcs->get_req_var("status")];
@@ -233,11 +292,11 @@ class Controller
 
                     $updateReseller = $helper->insertUpdate('mod_domain_status', $condition, $data);
                     if (is_string($updateReseller) && strpos($updateReseller, 'Error') !== false) {
-                        $helper->sendResponse(false, $updateReseller);
+                        $this->emitJsonResponse(false, $updateReseller);
                     }
-                    $helper->sendResponse(true, $updateReseller);
+                    $this->emitJsonResponse(true, $updateReseller);
                 } catch (\Exception $e) {
-                    $helper->sendResponse(false, 'Toggle failed: ' . $e->getMessage());
+                    $this->emitJsonResponse(false, 'Toggle failed: ' . $e->getMessage());
                 }
             }
 
@@ -248,13 +307,13 @@ class Controller
                     $allDomainList = $helper->fetch_table_record("tbldomainpricing", [], "");
                     $params = $helper->CredentialRegistrar();
                     if (empty($params['APIKey'])) {
-                        $helper->sendResponse(false, 'Registrar API key is not configured.');
+                        $this->emitJsonResponse(false, 'Registrar API key is not configured.');
                     }
 
                     $allApiTld = $helper->get("tldsync?APIKey=" . $params['APIKey'], [], "Get Domain List");
 
                     if ($helper->isTldSyncError($allApiTld['result'])) {
-                        $helper->sendResponse(false, $helper->tldSyncErrorMessage($allApiTld['result']));
+                        $this->emitJsonResponse(false, $helper->tldSyncErrorMessage($allApiTld['result']));
                     }
 
                     $byTld = array();
@@ -283,12 +342,12 @@ class Controller
                         $tldsPrices = $helper->domainPrice($finalDomain, 'true');
                         $updateproductprice = $helper->updateprice($products->currencyCode, $domainId, $tldsPrices);
                         if ($updateproductprice != 'success') {
-                            $helper->sendResponse(false, $lang['sync_error']);
+                            $this->emitJsonResponse(false, $lang['sync_error']);
                         }
                     }
-                    $helper->sendResponse(true, $lang['sync_success']);
+                    $this->emitJsonResponse(true, $lang['sync_success']);
                 } catch (\Exception $e) {
-                    $helper->sendResponse(false, 'Manual sync failed: ' . $e->getMessage());
+                    $this->emitJsonResponse(false, 'Manual sync failed: ' . $e->getMessage());
                 }
             }
 
@@ -308,8 +367,7 @@ class Controller
             $this->output();
         } catch (\Exception $e) {
             if ($this->isAjaxCall()) {
-                $helper = new Helper();
-                $helper->sendResponse(false, $e->getMessage());
+                $this->emitJsonResponse(false, $e->getMessage());
             }
             $this->tplVar['error'] = $e->getMessage();
         }
@@ -382,40 +440,22 @@ class Controller
                     $this->requireAdminToken(true, $draw);
 
                     if (empty($params['APIKey'])) {
-                        $this->emitJson($helper->dataTablesPayload(
-                            $draw,
-                            array(),
-                            false,
-                            'Registrar API key is not configured.',
-                            0,
-                            0
-                        ));
+                        $this->emitDataTablesError($draw, 'Registrar API key is not configured.');
                     }
 
                     $allDomainList = $helper->get("tldsync?APIKey=" . $params['APIKey'], [], "Get Domain List");
 
                     if ($helper->isTldSyncError($allDomainList['result'])) {
-                        $this->emitJson($helper->dataTablesPayload(
+                        $this->emitDataTablesError(
                             $draw,
-                            array(),
-                            false,
-                            $helper->tldSyncErrorMessage($allDomainList['result']),
-                            0,
-                            0
-                        ));
+                            $helper->tldSyncErrorMessage($allDomainList['result'])
+                        );
                     }
 
                     $tldRows = $helper->normalizeTldSyncList($allDomainList['result']);
                     $this->emitJson($helper->domainTable($tldRows, $_POST));
                 } catch (\Exception $e) {
-                    $this->emitJson($helper->dataTablesPayload(
-                        $draw,
-                        array(),
-                        false,
-                        'Sync TLDs failed: ' . $e->getMessage(),
-                        0,
-                        0
-                    ));
+                    $this->emitDataTablesError($draw, 'Sync TLDs failed: ' . $e->getMessage());
                 }
             }
 
@@ -427,6 +467,10 @@ class Controller
                     parse_str($data, $dataArray);
 
                     $finalDomain = [];
+
+                    if (empty($dataArray['checkbox']) || !is_array($dataArray['checkbox'])) {
+                        $this->emitJsonResponse(false, 'TLDs not selected.');
+                    }
 
                     foreach ($dataArray['checkbox'] as $key) {
                         // Using the $key to get the corresponding data from other arrays
@@ -442,7 +486,7 @@ class Controller
                     }
 
                     if (empty($finalDomain)) {
-                        $helper->sendResponse(false, 'Tlds Not selected');
+                        $this->emitJsonResponse(false, 'TLDs not selected.');
                     }
 
                     foreach ($finalDomain as $key => $domain) {
@@ -468,13 +512,13 @@ class Controller
                         $updateproductprice = $helper->updateprice($domain['currency_code'], $domainId, $productPrices);
 
                         if ($updateproductprice != 'success') {
-                            $helper->sendResponse(false, $lang['sync_error']);
+                            $this->emitJsonResponse(false, $lang['sync_error']);
                         }
                     }
 
-                    $helper->sendResponse(true, $lang['sync_success']);
+                    $this->emitJsonResponse(true, $lang['sync_success']);
                 } catch (\Exception $e) {
-                    $helper->sendResponse(false, 'Import failed: ' . $e->getMessage());
+                    $this->emitJsonResponse(false, 'Import failed: ' . $e->getMessage());
                 }
             }
 
@@ -482,8 +526,7 @@ class Controller
             $this->output();
         } catch (\Exception $e) {
             if ($this->isAjaxCall()) {
-                $helper = new Helper();
-                $helper->sendResponse(false, $e->getMessage());
+                $this->emitJsonResponse(false, $e->getMessage());
             }
             $this->tplVar['error'] = $e->getMessage();
         }
