@@ -9,6 +9,76 @@ if (!defined("WHMCS")) {
 class Transfers
 {
     /**
+     * Build TransferOrder query string. IsWhoisProtection must be appended
+     * before the URL is assembled (existing-client path previously dropped it).
+     *
+     * @param array<string, mixed> $dataArr
+     * @param mixed $isWhoisProtection
+     * @param string|null $couponCode
+     * @param array<string, mixed> $usExtras
+     * @return string
+     */
+    public static function buildTransferOrderQuery(
+        array $dataArr,
+        $isWhoisProtection,
+        $couponCode = '',
+        array $usExtras = array()
+    ) {
+        $query = http_build_query($dataArr);
+        $query .= '&IsWhoisProtection=' . $isWhoisProtection;
+        if (!(!isset($couponCode) || trim((string) $couponCode) === '')) {
+            $query .= '&couponCode=' . $couponCode;
+        }
+        if (!empty($usExtras['appPurpose'])) {
+            $query .= '&appPurpose=' . $usExtras['appPurpose'];
+        }
+        if (!empty($usExtras['nexusCategory'])) {
+            $query .= '&nexusCategory=' . $usExtras['nexusCategory'];
+        }
+        if (!empty($usExtras['isUs'])) {
+            $query .= '&isUs=' . $usExtras['isUs'];
+        }
+
+        return $query;
+    }
+
+    /**
+     * Cancel an in-progress transfer-in (ESHOP CancelTransfer).
+     *
+     * @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    public static function cancelTransfer($params)
+    {
+        try {
+            $helper = new Helper();
+            $apiKey = $params['APIKey'];
+            $domainname = DomainMapper::websiteName($params['sld'], $params['tld']);
+
+            $viewDomainurl = 'ViewDomain/?APIKey=' . $apiKey . '&websiteName=' . $domainname;
+            $viewDomainurl = str_replace(' ', '%20', trim($viewDomainurl));
+            $response = $helper->get($viewDomainurl, array(), 'CancelTransfer ViewDomain');
+
+            if ($response['result']['responseMsg']['statusCode'] != 200) {
+                return $helper->sendResponse($response['result']);
+            }
+
+            $domainNameId = $response['result']['responseData']['domainNameId'];
+            $query = 'APIKey=' . $apiKey . '&id=' . $domainNameId;
+            $cancelUrl = 'CancelTransfer/?' . $query;
+            $res = $helper->get($cancelUrl, array(), 'CancelTransfer');
+
+            if ($res['result']['responseMsg']['statusCode'] != 200) {
+                return $helper->sendResponse($res['result']);
+            }
+
+            return array('success' => 'Transfer cancelled successfully');
+        } catch (\Exception $e) {
+            return array('error' => $e->getMessage());
+        }
+    }
+
+    /**
      * @param array<string, mixed> $params
      * @return mixed
      */
@@ -91,11 +161,12 @@ class Transfers
                                     'Websitename' => $websitename,
                                     'AuthCode' => $authCode
                                 );
-                                $query = http_build_query($dataArr);
-                                $query = $query . '&IsWhoisProtection=' . $IsWhoisProtection;
-                                if (!(!isset($CouponCode) || trim($CouponCode) === '')) {
-                                    $query .= '&couponCode=' . $CouponCode;
-                                }
+                                $query = self::buildTransferOrderQuery(
+                                    $dataArr,
+                                    $IsWhoisProtection,
+                                    $CouponCode,
+                                    array()
+                                );
                                 $orderUrl = "TransferOrder/?" . $query;
                                 $orderUrl = trim($orderUrl);
                                 $orderUrl = str_replace(' ', '%20', $orderUrl);
@@ -126,25 +197,21 @@ class Transfers
                                 'Websitename' => $websitename,
                                 'AuthCode' => $authCode
                             );
-                            $query = http_build_query($dataArr);
-                            if (!(!isset($CouponCode) || trim($CouponCode) === '')) {
-                                $query .= '&couponCode=' . $CouponCode;
-                            }
+                            $usExtras = array();
                             if ($tld == "us") {
-
-                                $NexusCategory = $helper->nexusCategory($params);
-
-                                $appPurpose = $helper->appPurpose($params, '');
-
-                                $query .= '&appPurpose=' . $appPurpose;
-                                $query .= '&nexusCategory=' . $NexusCategory;
-                                $isUs = true;
-                                $query .= '&isUs=' . $isUs;
+                                $usExtras['nexusCategory'] = $helper->nexusCategory($params);
+                                $usExtras['appPurpose'] = $helper->appPurpose($params, '');
+                                $usExtras['isUs'] = true;
                             }
+                            $query = self::buildTransferOrderQuery(
+                                $dataArr,
+                                $IsWhoisProtection,
+                                $CouponCode,
+                                $usExtras
+                            );
                             $orderUrl = "TransferOrder/?" . $query;
                             $orderUrl = trim($orderUrl);
                             $orderUrl = str_replace(' ', '%20', $orderUrl);
-                            $query = $query . '&IsWhoisProtection=' . $IsWhoisProtection;
 
                             $res = $helper->get($orderUrl, [], "TransferOrder");
 

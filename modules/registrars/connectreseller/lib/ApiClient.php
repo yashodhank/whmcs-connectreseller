@@ -115,6 +115,18 @@ class ApiClient
     }
 
     /**
+     * POST JSON body to an ESHOP action (APIKey usually in $query).
+     *
+     * @param array<string, mixed> $query
+     * @param mixed $body
+     * @return array<string, mixed>
+     */
+    public function post($action, array $query = array(), $body = null, $logAction = '')
+    {
+        return $this->requestUrl('POST', $this->buildUrl($action, $query), $body, $logAction);
+    }
+
+    /**
      * @param string $payload
      * @return string
      */
@@ -137,15 +149,26 @@ class ApiClient
     {
         $curl = curl_init();
         $method = strtoupper($method);
+        $headers = array();
 
         if ($method === 'POST') {
             curl_setopt($curl, CURLOPT_POST, 1);
             curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
+            if ($payload !== '') {
+                $headers[] = 'Content-Type: application/json';
+            }
         } elseif ($method === 'PUT' || $method === 'DELETE') {
             curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
             curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
+            if ($payload !== '') {
+                $headers[] = 'Content-Type: application/json';
+            }
         } else {
             curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'GET');
+        }
+
+        if ($headers) {
+            curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
         }
 
         curl_setopt($curl, CURLOPT_URL, $url);

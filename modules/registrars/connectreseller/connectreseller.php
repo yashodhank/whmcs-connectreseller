@@ -22,7 +22,7 @@ use WHMCS\Domain\TopLevel\ImportItem;
 use WHMCS\Database\Capsule;
 
 if (!defined('CONNECTRESELLER_MODULE_VERSION')) {
-    define('CONNECTRESELLER_MODULE_VERSION', '3.0.4');
+    define('CONNECTRESELLER_MODULE_VERSION', '3.0.6');
 }
 
 $apiUrl = "https://api.connectreseller.com/ConnectReseller/";
@@ -271,6 +271,32 @@ function connectreseller_GetTldPricing($params)
     return Pricing::getTldPricing($params);
 }
 
+function connectreseller_GetDomainSuggestions($params)
+{
+    return Pricing::getDomainSuggestions($params);
+}
+
+/**
+ * Suspend domain at registry (ManageDomainSuspend). Present when WHMCS invokes
+ * the registrar SuspendDomain contract; also available via admin custom button.
+ *
+ * @param array<string, mixed> $params
+ * @return array<string, mixed>
+ */
+function connectreseller_SuspendDomain($params)
+{
+    return DomainLifecycle::setSuspend($params, true);
+}
+
+/**
+ * @param array<string, mixed> $params
+ * @return array<string, mixed>
+ */
+function connectreseller_UnsuspendDomain($params)
+{
+    return DomainLifecycle::setSuspend($params, false);
+}
+
 function connectreseller_ClientAreaCustomButtonArray()
 {
     try {
@@ -326,6 +352,51 @@ function connectreseller_unlock($params)
     }
 }
 
+/**
+ * @param array<string, mixed> $params
+ * @return array<string, mixed>
+ */
+function connectreseller_canceltransfer($params)
+{
+    return Transfers::cancelTransfer($params);
+}
+
+/**
+ * @param array<string, mixed> $params
+ * @return array<string, mixed>
+ */
+function connectreseller_regenerateauthcode($params)
+{
+    $result = DomainLifecycle::regenerateAuthCode($params);
+    if (!empty($result['error'])) {
+        return $result;
+    }
+    $code = isset($result['eppcode']) ? $result['eppcode'] : '';
+
+    return array(
+        'success' => 'Auth code regenerated'
+            . ($code !== '' ? ': ' . $code : ''),
+    );
+}
+
+/**
+ * @param array<string, mixed> $params
+ * @return array<string, mixed>
+ */
+function connectreseller_suspend($params)
+{
+    return DomainLifecycle::setSuspend($params, true);
+}
+
+/**
+ * @param array<string, mixed> $params
+ * @return array<string, mixed>
+ */
+function connectreseller_unsuspend($params)
+{
+    return DomainLifecycle::setSuspend($params, false);
+}
+
 function connectreseller_AdminCustomButtonArray($params)
 {
     try {
@@ -333,6 +404,10 @@ function connectreseller_AdminCustomButtonArray($params)
         return [
             'Lock' => 'lock',
             'Unlock' => 'unlock',
+            'Cancel Transfer' => 'canceltransfer',
+            'Regenerate Auth Code' => 'regenerateauthcode',
+            'Suspend Domain' => 'suspend',
+            'Unsuspend Domain' => 'unsuspend',
         ];
     } catch (\Exception $e) {
         return array(

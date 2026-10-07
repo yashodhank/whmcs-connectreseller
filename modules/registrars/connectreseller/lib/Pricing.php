@@ -77,6 +77,109 @@ class Pricing
     }
 
     /**
+     * Map ESHOP domainSuggestion to WHMCS GetDomainSuggestions.
+     *
+     * @param array<string, mixed> $params
+     * @return mixed
+     */
+    public static function getDomainSuggestions($params)
+    {
+        try {
+            $helper = new Helper();
+            $apiKey = isset($params['APIKey']) ? $params['APIKey'] : '';
+            $keyword = '';
+            if (!empty($params['searchTerm'])) {
+                $keyword = (string) $params['searchTerm'];
+            } elseif (!empty($params['sld'])) {
+                $keyword = (string) $params['sld'];
+            }
+            if ($keyword === '' || $apiKey === '') {
+                return new ResultsList();
+            }
+
+            $maxResult = 10;
+            if (!empty($params['suggestionSettings']['maxResults'])) {
+                $maxResult = (int) $params['suggestionSettings']['maxResults'];
+            } elseif (!empty($params['maxResults'])) {
+                $maxResult = (int) $params['maxResults'];
+            }
+            if ($maxResult < 1) {
+                $maxResult = 10;
+            }
+            if ($maxResult > 50) {
+                $maxResult = 50;
+            }
+
+            $query = 'APIKey=' . $apiKey
+                . '&keyword=' . rawurlencode($keyword)
+                . '&maxResult=' . $maxResult;
+            $url = str_replace(' ', '%20', trim('domainSuggestion/?' . $query));
+            $response = $helper->get($url, array(), 'GetDomainSuggestions');
+            $result = isset($response['result']) ? $response['result'] : array();
+
+            $list = self::extractSuggestionList($result);
+            $allowedTlds = array();
+            if (!empty($params['tldsToInclude']) && is_array($params['tldsToInclude'])) {
+                foreach ($params['tldsToInclude'] as $tld) {
+                    $allowedTlds[] = ltrim(strtolower((string) $tld), '.');
+                }
+            }
+
+            $results = new ResultsList();
+            foreach ($list as $domain) {
+                if (!is_array($domain) || empty($domain['domainName'])) {
+                    continue;
+                }
+                $full = (string) $domain['domainName'];
+                $parts = explode('.', $full, 2);
+                if (count($parts) < 2) {
+                    continue;
+                }
+                $tld = strtolower($parts[1]);
+                if ($allowedTlds && !in_array($tld, $allowedTlds, true)) {
+                    continue;
+                }
+                $searchResult = new SearchResult($parts[0], '.' . $parts[1]);
+                $searchResult->setStatus(SearchResult::STATUS_NOT_REGISTERED);
+                if (!empty($params['premiumEnabled']) && isset($domain['price'])) {
+                    $searchResult->setPremiumDomain(false);
+                }
+                $results->append($searchResult);
+            }
+
+            return $results;
+        } catch (\Exception $e) {
+            return array('error' => $e->getMessage());
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @return array<int, array<string, mixed>>
+     */
+    public static function extractSuggestionList(array $result)
+    {
+        if (isset($result['responseData']['registryDomainSuggestionList'])
+            && is_array($result['responseData']['registryDomainSuggestionList'])
+        ) {
+            return $result['responseData']['registryDomainSuggestionList'];
+        }
+        if (isset($result['registryDomainSuggestionList'])
+            && is_array($result['registryDomainSuggestionList'])
+        ) {
+            return $result['registryDomainSuggestionList'];
+        }
+        // Vendor PDF sometimes nests the list under responseMsg.
+        if (isset($result['responseMsg']['registryDomainSuggestionList'])
+            && is_array($result['responseMsg']['registryDomainSuggestionList'])
+        ) {
+            return $result['responseMsg']['registryDomainSuggestionList'];
+        }
+
+        return array();
+    }
+
+    /**
      * @param array<string, mixed> $params
      * @return mixed
      */
