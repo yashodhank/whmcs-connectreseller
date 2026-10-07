@@ -1,7 +1,7 @@
 # ConnectReseller for WHMCS
 
 Community-maintained fork of ConnectReseller’s free open-source WHMCS registrar
-plugin **2.5.1**. Current fork release identity: **3.0.3**.
+plugin **2.5.1**. Current fork release identity: **3.0.6**.
 
 This is a drop-in replacement: keep the registrar directory name
 `connectreseller` so existing `tblregistrars` rows and production installs
@@ -14,7 +14,7 @@ GitHub Releases under the MIT license.
 
 | Field | Value |
 |-------|--------|
-| Module version | `3.0.3` |
+| Module version | `3.0.6` |
 | WHMCS registrar `APIVersion` | `1.1` (function contract; **not** the module version) |
 | PHP | **7.4–8.3** (WHMCS 8.x and 9.x) |
 | Language ceiling in shipped code | PHP **7.4** only |
@@ -25,7 +25,8 @@ GitHub Releases under the MIT license.
 - Original plugin: [ConnectReseller](https://www.connectreseller.com/) WHMCS
   registrar 2.5.1 (open-source / free of charge).
 - Official API: [CR API Document V11](https://www.connectreseller.com/resources/downloads/CR_API_Document_V11.pdf)
-  (copy in [`docs/vendor/CR_API_Document_V11.pdf`](docs/vendor/CR_API_Document_V11.pdf)).
+  / [V12](https://www.connectreseller.com/resources/downloads/CR_API_Document_V12.pdf)
+  (copies in [`docs/vendor/`](docs/vendor/)).
 - Module install notes from the vendor zip:
   [`docs/vendor/module_instruction.pdf`](docs/vendor/module_instruction.pdf).
 
@@ -94,9 +95,14 @@ text/CRLF-converted assets.
 - `connectreseller_MetaData()['APIVersion']` is **1.1**, the registrar module
   function-contract version required by WHMCS. The vendor shipped `2.5.1` here,
   which is not a valid WHMCS API version.
-- `RequestDelete` is **not implemented**. ConnectReseller V11 exposes
-  suspend/lock, not domain delete. Use registrar lock/suspend at the panel, or
-  wait for a future module release if an official delete endpoint appears.
+- `RequestDelete` is **not implemented**. ConnectReseller exposes
+  `ManageDomainSuspend` (wired as Suspend/Unsuspend + admin buttons), not
+  domain delete. Use suspend/lock, or wait for an official delete endpoint.
+- `GetDomainSuggestions` maps to ESHOP `domainSuggestion`.
+- Admin domain buttons: Lock/Unlock, Cancel Transfer, Regenerate Auth Code,
+  Suspend/Unsuspend Domain.
+- Addon **Bulk Nameservers** tab posts to ESHOP `nameserverbulkaction`
+  (admin + CSRF).
 - `TestConnection` uses V11 **Check Reseller Available funds**
   (`availablefund`).
 - `GetDomainInformation` is implemented for WHMCS 7.6+ (preferred over
