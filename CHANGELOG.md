@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.6] - 2026-10-07
+
+Optional ConnectReseller ESHOP API capabilities that neither the vendor zip nor
+this fork implemented, plus a transfer WHOIS query-order bug shared with vendor.
+
+### Fixed
+
+- Existing-client domain transfer now appends `IsWhoisProtection` to the
+  TransferOrder query **before** building `$orderUrl` (it was previously added
+  to `$query` after the URL was already assembled and never sent). New-client
+  path was already correct.
+
+### Added
+
+- `connectreseller_GetDomainSuggestions` → ESHOP `domainSuggestion`.
+- Admin custom buttons: **Cancel Transfer** (`CancelTransfer`), **Regenerate
+  Auth Code** (`updateAuthCode`), **Suspend Domain** / **Unsuspend Domain**
+  (`ManageDomainSuspend`).
+- Registrar `SuspendDomain` / `UnsuspendDomain` wrappers for hosts that invoke
+  those contract names.
+- Addon admin tab **Bulk Nameservers** → ESHOP `nameserverbulkaction` (POST
+  JSON, admin CSRF).
+- Vendor API PDF copy: `docs/vendor/CR_API_Document_V12.pdf`.
+
+### Changed
+
+- Module / addon version is **3.0.6**.
+- `ApiClient` POST/PUT sets `Content-Type: application/json` when a body is sent.
+
+### Deferred
+
+- `RequestDelete`: ConnectReseller still has no domain-delete ESHOP endpoint
+  (suspend/lock only). Not wired.
+
+[3.0.6]: https://github.com/yashodhank/whmcs-connectreseller/releases/tag/v3.0.6
+
 ## [3.0.5] - 2026-09-06
 
 Addon admin failures must stay visible in WHMCS, and missing admin JS

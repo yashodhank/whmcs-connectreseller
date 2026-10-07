@@ -15,7 +15,7 @@ final class WhmcsContractTest extends TestCase
             dirname(__DIR__, 2) . '/modules/registrars/connectreseller/connectreseller.php'
         );
         self::assertStringContainsString("'APIVersion' => '1.1'", $source);
-        self::assertStringContainsString("define('CONNECTRESELLER_MODULE_VERSION', '3.0.4')", $source);
+        self::assertStringContainsString("define('CONNECTRESELLER_MODULE_VERSION', '3.0.6')", $source);
         self::assertStringContainsString('function connectreseller_TestConnection', $source);
         self::assertStringContainsString('function connectreseller_GetDomainInformation', $source);
         self::assertStringNotContainsString("'APIVersion' => '2.5.1'", $source);
@@ -29,8 +29,8 @@ final class WhmcsContractTest extends TestCase
         $controller = (string) file_get_contents(
             dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/Admin/Controller.php'
         );
-        self::assertStringContainsString("'version' => '3.0.5'", $addon);
-        self::assertStringContainsString("private const MODULE_VERSION = '3.0.5';", $controller);
+        self::assertStringContainsString("'version' => '3.0.6'", $addon);
+        self::assertStringContainsString("private const MODULE_VERSION = '3.0.6';", $controller);
     }
 
     public function testFundsResponseAcceptsStatusZero(): void
