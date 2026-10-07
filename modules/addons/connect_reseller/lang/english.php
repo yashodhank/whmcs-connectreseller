@@ -6,6 +6,10 @@ $_ADDONLANG['addon_desc'] = "This module provides to ConnectReseller Access";
 /* header */
 $_ADDONLANG['enbaledisable'] = "Automation Setting";
 $_ADDONLANG['domainsync'] = "Sync TLDs";
+$_ADDONLANG['bulkns'] = "Bulk Nameservers";
+$_ADDONLANG['bulkns_note'] = "<strong>Note:</strong> Updates nameservers for multiple domains in one ConnectReseller API call (admin only, CSRF protected). Provide at least two nameservers. Domains are space-, comma-, or newline-separated.";
+$_ADDONLANG['bulkns_domains'] = "Domains";
+$_ADDONLANG['bulkns_submit'] = "Update nameservers";
 $_ADDONLANG['manualsync'] = "Manual Sync";
 $_ADDONLANG['existtld'] = "Existing TLD";
 

@@ -1,14 +1,14 @@
 {assign var=unique_id value=10|mt_rand:20000000}
 
 <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-<link rel="stylesheet" type="text/css" href="{$tplVar.cssPath}style.css?v={$tplVar.moduleVersion|default:'3.0.5'}-{$unique_id}">
+<link rel="stylesheet" type="text/css" href="{$tplVar.cssPath}style.css?v={$tplVar.moduleVersion|default:'3.0.6'}-{$unique_id}">
 <script>
 window.ConnectResellerAddon = {
     moduleLink: "{$tplVar.moduleLink|escape:'javascript'}",
     token: "{$tplVar.csrfToken|escape:'javascript'}"
 };
 </script>
-<script src="{$tplVar.scriptPath}script.js?v={$tplVar.moduleVersion|default:'3.0.5'}-{$unique_id}"></script>
+<script src="{$tplVar.scriptPath}script.js?v={$tplVar.moduleVersion|default:'3.0.6'}-{$unique_id}"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.2/additional-methods.min.js"></script>
@@ -25,6 +25,7 @@ window.ConnectResellerAddon = {
                 <a href="{$tplVar.domainsyncLink}" class="{if $tplVar.tab =='domainsync' || $tplVar.tab==''}active{/if}"><i class="fas fa-sync-alt fa-fw"></i>{$tplVar['lang']['domainsync']}</a>
             </li>
             <li class=""><a href="{$tplVar.enabledisableLink}" class="{if $tplVar.tab =='enabledisable'}active{/if}"><i class="fas fa-cog fa-fw" aria-hidden="true"></i>{$tplVar['lang']['enbaledisable']}</a></li>
+            <li class=""><a href="{$tplVar.bulknsLink}" class="{if $tplVar.tab =='bulkns'}active{/if}"><i class="fas fa-server fa-fw" aria-hidden="true"></i>{$tplVar['lang']['bulkns']}</a></li>
         </ul>
     </div>
 </div>
