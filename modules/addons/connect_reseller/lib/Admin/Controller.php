@@ -14,7 +14,7 @@ use Smarty;
 
 class Controller
 {
-    private const MODULE_VERSION = '3.0.5';
+    private const MODULE_VERSION = '3.0.6';
 
     public $params = [];
     public $tplDIR;
@@ -41,6 +41,7 @@ class Controller
         $this->tplVar['moduleBaseLink'] = $moduleBaseLink;
         $this->tplVar['domainsyncLink'] = $this->buildActionLink($moduleBaseLink, 'domainsync');
         $this->tplVar['enabledisableLink'] = $this->buildActionLink($moduleBaseLink, 'enabledisable');
+        $this->tplVar['bulknsLink'] = $this->buildActionLink($moduleBaseLink, 'bulkns');
         $this->tplVar['module'] = $params['module'];
         $this->tplVar['tplDIR'] = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/";
         $this->tplVar['header'] = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/header.tpl";
@@ -531,6 +532,88 @@ class Controller
             $this->tplVar['error'] = $e->getMessage();
         }
     }
+
+    /**
+     * Minimal admin utility: bulk nameserver update via ESHOP nameserverbulkaction.
+     *
+     * @param array<string, mixed> $vars
+     * @return void
+     */
+    public function bulkns($vars)
+    {
+        try {
+            global $whmcs;
+            $formSubmitMessage = array();
+
+            if (!empty($whmcs->get_req_var('formaction'))
+                && $whmcs->get_req_var('formaction') === 'runBulkNs'
+            ) {
+                $this->requireAdminToken();
+
+                $domainsRaw = (string) $whmcs->get_req_var('domains');
+                $domainNames = preg_split('/[\s,;]+/', $domainsRaw) ?: array();
+                $nameservers = array();
+                for ($i = 1; $i <= 13; $i++) {
+                    $val = trim((string) $whmcs->get_req_var('nameserver' . $i));
+                    if ($val !== '') {
+                        $nameservers['nameserver' . $i] = $val;
+                    }
+                }
+
+                $helper = new Helper();
+                $creds = $helper->CredentialRegistrar();
+                $apiKey = isset($creds['APIKey']) ? (string) $creds['APIKey'] : '';
+
+                if (!class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\Nameservers')) {
+                    $nsFile = dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Nameservers.php';
+                    if (is_readable($nsFile)) {
+                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/ApiClient.php';
+                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Helper.php';
+                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/DomainMapper.php';
+                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Sensitive.php';
+                        require_once $nsFile;
+                    }
+                }
+
+                if (!class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\Nameservers')) {
+                    $formSubmitMessage = array(
+                        'status' => 'error',
+                        'message' => 'Registrar Nameservers service unavailable',
+                    );
+                } else {
+                    $regHelper = new \WHMCS\Module\Registrar\ConnectReseller\Helper();
+                    $result = \WHMCS\Module\Registrar\ConnectReseller\Nameservers::bulkUpdate(
+                        $apiKey,
+                        $domainNames,
+                        $nameservers,
+                        $regHelper
+                    );
+                    if (!empty($result['error'])) {
+                        $formSubmitMessage = array(
+                            'status' => 'error',
+                            'message' => (string) $result['error'],
+                        );
+                    } else {
+                        $formSubmitMessage = array(
+                            'status' => 'success',
+                            'message' => isset($result['message'])
+                                ? (string) $result['message']
+                                : 'Bulk nameserver update accepted',
+                        );
+                    }
+                }
+            }
+
+            $this->tplFileName = $this->tplVar['tab'] = __FUNCTION__;
+            $this->tplVar['formSubmitMessage'] = $formSubmitMessage;
+            $this->output();
+        } catch (\Exception $e) {
+            $this->tplVar['error'] = $e->getMessage();
+            $this->tplFileName = 'error';
+            $this->output();
+        }
+    }
+
     public function output($data = null)
     {
         try {
