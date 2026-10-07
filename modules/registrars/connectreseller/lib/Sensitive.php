@@ -20,6 +20,24 @@ class Sensitive
     }
 
     /**
+     * Registry-friendly auth/EPP code (16 alphanumeric chars).
+     * Never log the return value.
+     *
+     * @return string
+     */
+    public static function randomAuthCode()
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        $max = strlen($alphabet) - 1;
+        $code = '';
+        for ($i = 0; $i < 16; $i++) {
+            $code .= $alphabet[random_int(0, $max)];
+        }
+
+        return $code;
+    }
+
+    /**
      * Redact API keys and passwords from values sent to logModuleCall.
      *
      * @param mixed $value

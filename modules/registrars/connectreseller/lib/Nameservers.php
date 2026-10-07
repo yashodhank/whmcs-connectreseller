@@ -99,6 +99,74 @@ class Nameservers
     }
 
     /**
+     * Bulk nameserver update (ESHOP nameserverbulkaction, POST JSON).
+     *
+     * @param string $apiKey
+     * @param array<int, string> $domainNames
+     * @param array<string, string> $nameservers keys nameserver1..nameserver13
+     * @param Helper|null $helper
+     * @return array<string, mixed>
+     */
+    public static function bulkUpdate($apiKey, array $domainNames, array $nameservers, $helper = null)
+    {
+        try {
+            $helper = $helper instanceof Helper ? $helper : new Helper();
+            $domains = array();
+            foreach ($domainNames as $name) {
+                $name = trim((string) $name);
+                if ($name !== '') {
+                    $domains[] = $name;
+                }
+            }
+            if ($apiKey === '' || count($domains) === 0) {
+                return array('error' => 'API key and at least one domain are required');
+            }
+
+            $body = array('DomainNames' => $domains);
+            $nsCount = 0;
+            for ($i = 1; $i <= 13; $i++) {
+                $key = 'nameserver' . $i;
+                if (!empty($nameservers[$key])) {
+                    $body[$key] = (string) $nameservers[$key];
+                    $nsCount++;
+                }
+            }
+            if ($nsCount < 2) {
+                return array('error' => 'At least two nameservers are required');
+            }
+
+            $url = 'nameserverbulkaction?APIKey=' . rawurlencode((string) $apiKey);
+            $res = $helper->post($url, $body, 'nameserverbulkaction');
+            $result = isset($res['result']) ? $res['result'] : array();
+
+            $statusCode = null;
+            if (isset($result['statusCode'])) {
+                $statusCode = (int) $result['statusCode'];
+            } elseif (isset($result['responseMsg']['statusCode'])) {
+                $statusCode = (int) $result['responseMsg']['statusCode'];
+            }
+
+            if ($statusCode !== null && $statusCode !== 200) {
+                $message = isset($result['message'])
+                    ? (string) $result['message']
+                    : (isset($result['responseMsg']['message'])
+                        ? (string) $result['responseMsg']['message']
+                        : 'Bulk nameserver update failed');
+
+                return array('error' => $message);
+            }
+
+            $message = isset($result['message'])
+                ? (string) $result['message']
+                : 'Bulk nameserver update accepted';
+
+            return array('success' => true, 'message' => $message);
+        } catch (\Exception $e) {
+            return array('error' => $e->getMessage());
+        }
+    }
+
+    /**
      * @param array<string, mixed> $params
      * @return mixed
      */

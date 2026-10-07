@@ -246,6 +246,94 @@ class DomainLifecycle
     }
 
     /**
+     * Regenerate / set domain auth code via ESHOP updateAuthCode.
+     *
+     * @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    public static function regenerateAuthCode($params)
+    {
+        try {
+            $helper = new Helper();
+            $apiKey = $params['APIKey'];
+            $domainname = DomainMapper::websiteName($params['sld'], $params['tld']);
+            $authCode = !empty($params['authCode'])
+                ? (string) $params['authCode']
+                : Sensitive::randomAuthCode();
+
+            $viewDomainurl = 'ViewDomain/?APIKey=' . $apiKey . '&websiteName=' . $domainname;
+            $viewDomainurl = str_replace(' ', '%20', trim($viewDomainurl));
+            $response = $helper->get($viewDomainurl, array(), 'updateAuthCode ViewDomain');
+
+            if ($response['result']['responseMsg']['statusCode'] != 200) {
+                return $helper->sendResponse($response['result']);
+            }
+
+            $domainNameId = $response['result']['responseData']['domainNameId'];
+            $query = 'APIKey=' . $apiKey
+                . '&domainNameId=' . $domainNameId
+                . '&websiteName=' . $domainname
+                . '&authCode=' . urlencode($authCode);
+            $url = 'updateAuthCode/?' . $query;
+            $res = $helper->get(str_replace(' ', '%20', trim($url)), array(), 'updateAuthCode');
+
+            if ($res['result']['responseMsg']['statusCode'] != 200) {
+                return $helper->sendResponse($res['result']);
+            }
+
+            return array(
+                'success' => 'Auth code updated',
+                'eppcode' => $authCode,
+            );
+        } catch (\Exception $e) {
+            return array('error' => $e->getMessage());
+        }
+    }
+
+    /**
+     * Suspend or unsuspend a domain via ESHOP ManageDomainSuspend.
+     *
+     * @param array<string, mixed> $params
+     * @param bool $suspend
+     * @return array<string, mixed>
+     */
+    public static function setSuspend($params, $suspend)
+    {
+        try {
+            $helper = new Helper();
+            $apiKey = $params['APIKey'];
+            $domainname = DomainMapper::websiteName($params['sld'], $params['tld']);
+            $flag = $suspend ? 'true' : 'false';
+
+            $viewDomainurl = 'ViewDomain/?APIKey=' . $apiKey . '&websiteName=' . $domainname;
+            $viewDomainurl = str_replace(' ', '%20', trim($viewDomainurl));
+            $response = $helper->get($viewDomainurl, array(), 'ManageDomainSuspend ViewDomain');
+
+            if ($response['result']['responseMsg']['statusCode'] != 200) {
+                return $helper->sendResponse($response['result']);
+            }
+
+            $domainNameId = $response['result']['responseData']['domainNameId'];
+            $query = 'APIKey=' . $apiKey
+                . '&domainNameId=' . $domainNameId
+                . '&websiteName=' . $domainname
+                . '&isDomainSuspend=' . $flag;
+            $url = 'ManageDomainSuspend/?' . $query;
+            $res = $helper->get(str_replace(' ', '%20', trim($url)), array(), 'ManageDomainSuspend');
+
+            if ($res['result']['responseMsg']['statusCode'] != 200) {
+                return $helper->sendResponse($res['result']);
+            }
+
+            return array(
+                'success' => $suspend ? 'Domain suspended' : 'Domain unsuspended',
+            );
+        } catch (\Exception $e) {
+            return array('error' => $e->getMessage());
+        }
+    }
+
+    /**
      * @param array<string, mixed> $params
      * @return mixed
      */
