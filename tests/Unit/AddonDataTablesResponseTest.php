@@ -144,8 +144,14 @@ final class AddonDataTablesResponseTest extends TestCase
             dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/Admin/Controller.php'
         );
         self::assertStringContainsString('private function emitJson($body)', $src);
-        self::assertStringContainsString('private function emitJsonResponse($status, $message, array $extra = array())', $src);
-        self::assertStringContainsString('private function emitDataTablesError($draw, $message, $recordsTotal = 0, $recordsFiltered = 0)', $src);
+        self::assertStringContainsString(
+            'private function emitJsonResponse($status, $message, array $extra = array())',
+            $src
+        );
+        self::assertStringContainsString(
+            'private function emitDataTablesError($draw, $message, $recordsTotal = 0, $recordsFiltered = 0)',
+            $src
+        );
         self::assertStringContainsString('requireAdminToken(true, $draw)', $src);
         self::assertStringContainsString('Sync TLDs failed:', $src);
         self::assertStringContainsString('hash_equals($expected, $token)', $src);
@@ -165,6 +171,9 @@ final class AddonDataTablesResponseTest extends TestCase
         self::assertStringContainsString('function connect_reseller_render_admin_error(\\Throwable $e)', $src);
         self::assertStringContainsString('ConnectReseller addon failed to load.', $src);
         self::assertStringContainsString('catch (\\Throwable $e)', $src);
-        self::assertStringNotContainsString("return ['status' => \"error\", 'description' => 'Unable to Showing addon module:", $src);
+        self::assertStringNotContainsString(
+            "return ['status' => \"error\", 'description' => 'Unable to Showing addon module:",
+            $src
+        );
     }
 }
