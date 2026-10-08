@@ -72,10 +72,9 @@ final class ApiUpgradesTest extends TestCase
             dirname(__DIR__, 2) . '/modules/registrars/connectreseller/lib/Transfers.php'
         );
         // Regression: WHOIS must not be appended after $orderUrl is built.
-        self::assertDoesNotMatchRegularExpression(
-            '/\$orderUrl\s*=\s*"TransferOrder\/\?"\s*\.\s*\$query;[\s\S]{0,200}\$query\s*=\s*\$query\s*\.\s*[\'"]\&IsWhoisProtection=/',
-            $source
-        );
+        $lateWhoisPattern = '/\$orderUrl\s*=\s*"TransferOrder\/\?"\s*\.\s*\$query;'
+            . '[\s\S]{0,200}\$query\s*=\s*\$query\s*\.\s*[\'"]\&IsWhoisProtection=/';
+        self::assertDoesNotMatchRegularExpression($lateWhoisPattern, $source);
         self::assertStringContainsString('buildTransferOrderQuery', $source);
     }
 
