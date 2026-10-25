@@ -94,4 +94,42 @@ final class ApiClientTest extends TestCase
         self::assertStringNotContainsString('live-secret', $GLOBALS['connectreseller_last_log']['request']['url']);
         self::assertSame('***', $GLOBALS['connectreseller_last_log']['response']['responseData']['authCode']);
     }
+
+    public function testAcceptResponseChunkAllowsExactly32MiBAndRejectsTheNextByte(): void
+    {
+        self::assertSame(32 * 1024 * 1024, ApiClient::MAX_RESPONSE_BYTES);
+
+        $buffer = '';
+        $chunk = str_repeat('a', 1024 * 1024);
+        $written = 0;
+        for ($i = 0; $i < 32; $i++) {
+            $written += ApiClient::acceptResponseChunk($buffer, $chunk);
+        }
+
+        self::assertSame(ApiClient::MAX_RESPONSE_BYTES, $written);
+        self::assertSame(ApiClient::MAX_RESPONSE_BYTES, strlen($buffer));
+
+        try {
+            ApiClient::acceptResponseChunk($buffer, 'b');
+            self::fail('Expected the byte past 32 MiB to throw');
+        } catch (\Exception $exception) {
+            self::assertSame('ConnectReseller response exceeded 32 MiB', $exception->getMessage());
+        }
+
+        self::assertSame(ApiClient::MAX_RESPONSE_BYTES, strlen($buffer));
+        self::assertStringNotContainsString('b', $buffer);
+    }
+
+    public function testCurlDispatchUsesTheBoundedWriteCallback(): void
+    {
+        $source = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/registrars/connectreseller/lib/ApiClient.php'
+        );
+        $dispatch = substr($source, (int) strpos($source, 'function curlDispatch'));
+
+        self::assertStringContainsString('CURLOPT_WRITEFUNCTION', $dispatch);
+        self::assertStringContainsString('acceptResponseChunk', $dispatch);
+        self::assertStringNotContainsString('CURLOPT_MAXFILESIZE', $dispatch);
+        self::assertStringNotContainsString('strlen($response)', $dispatch);
+    }
 }
