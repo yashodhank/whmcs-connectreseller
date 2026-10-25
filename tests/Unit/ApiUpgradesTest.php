@@ -155,7 +155,7 @@ final class ApiUpgradesTest extends TestCase
         $source = (string) file_get_contents(
             dirname(__DIR__, 2) . '/modules/registrars/connectreseller/connectreseller.php'
         );
-        self::assertStringContainsString("define('CONNECTRESELLER_MODULE_VERSION', '3.0.6')", $source);
+        self::assertStringContainsString("define('CONNECTRESELLER_MODULE_VERSION', '3.0.7')", $source);
         self::assertStringContainsString('function connectreseller_GetDomainSuggestions', $source);
         self::assertStringContainsString('function connectreseller_SuspendDomain', $source);
         self::assertStringContainsString('function connectreseller_UnsuspendDomain', $source);
