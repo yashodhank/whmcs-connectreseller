@@ -14,24 +14,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['7.4', '8.1', '8.2', '8.3']
+        include:
+          - php: '7.4'
+            setup: '7.4'
+          - php: '8.1'
+            setup: '8.1'
+          - php: '8.2'
+            setup: '8.2.35'
+            floor: '8.2.35'
+          - php: '8.3'
+            setup: '8.3.36'
+            floor: '8.3.36'
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          # 8.2/8.3 are exact patches. Do not fall back to floating 8.2 or 8.3.
+          php-version: ${{ matrix.setup }}
           extensions: curl, json, mbstring
           coverage: none
           tools: composer:v2
+      - name: Assert patched PHP
+        if: ${{ matrix.floor }}
+        env:
+          PHP_FLOOR: ${{ matrix.floor }}
+        run: php -r 'fwrite(STDERR, "PHP_VERSION=" . PHP_VERSION . " floor=" . getenv("PHP_FLOOR") . PHP_EOL); exit(version_compare(PHP_VERSION, getenv("PHP_FLOOR"), ">=") ? 0 : 1);'
       - name: Get Composer cache directory
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          key: ${{ runner.os }}-composer-${{ matrix.setup }}-${{ hashFiles('composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-composer-${{ matrix.php }}-
+            ${{ runner.os }}-composer-${{ matrix.setup }}-
             ${{ runner.os }}-composer-
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
