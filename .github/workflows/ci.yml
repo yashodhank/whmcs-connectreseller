@@ -19,7 +19,8 @@ jobs:
           coverage: none
           tools: composer:v2
       - name: Assert patched PHP
-        run: php -r 'fwrite(STDERR, "PHP_VERSION=" . PHP_VERSION . PHP_EOL); exit(version_compare(PHP_VERSION, "8.2.35", ">=") ? 0 : 1);'
+        run: |
+          php -r 'fwrite(STDERR, "PHP_VERSION=" . PHP_VERSION . PHP_EOL); exit(version_compare(PHP_VERSION, "8.2.35", ">=") ? 0 : 1);'
       - name: Get Composer cache directory
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
@@ -62,8 +63,10 @@ jobs:
         include:
           - php: '7.4'
             setup: '7.4'
+            floor: ''
           - php: '8.1'
             setup: '8.1'
+            floor: ''
           - php: '8.2'
             setup: '8.2.35'
             floor: '8.2.35'
@@ -80,10 +83,11 @@ jobs:
           coverage: none
           tools: composer:v2
       - name: Assert patched PHP
-        if: ${{ matrix.floor }}
+        if: ${{ matrix.floor != '' }}
         env:
           PHP_FLOOR: ${{ matrix.floor }}
-        run: php -r 'fwrite(STDERR, "PHP_VERSION=" . PHP_VERSION . " floor=" . getenv("PHP_FLOOR") . PHP_EOL); exit(version_compare(PHP_VERSION, getenv("PHP_FLOOR"), ">=") ? 0 : 1);'
+        run: |
+          php -r 'fwrite(STDERR, "PHP_VERSION=" . PHP_VERSION . " floor=" . getenv("PHP_FLOOR") . PHP_EOL); exit(version_compare(PHP_VERSION, getenv("PHP_FLOOR"), ">=") ? 0 : 1);'
       - name: Get Composer cache directory
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
