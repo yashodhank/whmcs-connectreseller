@@ -19,8 +19,11 @@ final class AdminPathResolutionTest extends TestCase
 
     public function testRegistrarLibPathResolvesInRepoLayout(): void
     {
-        foreach (array('KycCron.php', 'CronStateStore.php', 'CapsuleCronStore.php', 'CronGuard.php',
-            'Nameservers.php', 'ApiClient.php', 'Helper.php', 'DomainMapper.php', 'Sensitive.php') as $file) {
+        $files = array(
+            'KycCron.php', 'CronStateStore.php', 'CapsuleCronStore.php', 'CronGuard.php',
+            'Nameservers.php', 'ApiClient.php', 'Helper.php', 'DomainMapper.php', 'Sensitive.php',
+        );
+        foreach ($files as $file) {
             $path = Controller::registrarLibPath($file);
             self::assertFileExists($path, $file);
             self::assertStringContainsString('/modules/registrars/connectreseller/lib/', str_replace('\\', '/', $path));
