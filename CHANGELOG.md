@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.8] - 2026-11-02
+
+The addon admin `Controller` resolved the registrar lib directory one level too
+shallow, so the bulk-nameserver and run-KYC-now actions reported the registrar
+code as unavailable.
+
+### Fixed
+
+- `Admin/Controller.php` used `dirname(__DIR__, 3)` (modules/addons) for the
+  registrar lib path; it now uses `Controller::registrarLibPath()` which resolves
+  `dirname(__DIR__, 4)` (the modules directory). Covers bulk nameservers and
+  the KYC cron action. `Helper.php` and `PriceSyncTask.php` sit one level higher
+  and were already correct.
+- Added `AdminPathResolutionTest` (real layout, mock WHMCS tree, source tripwire).
+
+### Changed
+
+- Module / addon version is **3.0.8**.
+
+[3.0.8]: https://github.com/yashodhank/whmcs-connectreseller/compare/v3.0.7...main
+
 ## [3.0.7] - 2026-10-25
 
 The registrar HTTP client now stops at a 32 MiB worker bound, and the PHP 8.2

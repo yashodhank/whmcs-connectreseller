@@ -14,7 +14,17 @@ use Smarty;
 
 class Controller
 {
-    private const MODULE_VERSION = '3.0.7';
+    private const MODULE_VERSION = '3.0.8';
+
+    /**
+     * Absolute path of a registrar lib file. This class lives in
+     * modules/addons/connect_reseller/lib/Admin, so the modules directory is
+     * four levels up (3 resolves to modules/addons, which is wrong).
+     */
+    public static function registrarLibPath(string $file): string
+    {
+        return dirname(__DIR__, 4) . '/registrars/connectreseller/lib/' . $file;
+    }
 
     public $params = [];
     public $tplDIR;
@@ -241,11 +251,11 @@ class Controller
                 if ($formaction == 'runKycNow') {
                     $this->requireAdminToken();
                     if (!class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\KycCron')) {
-                        $cronFile = dirname(__DIR__, 3) . '/registrars/connectreseller/lib/KycCron.php';
+                        $cronFile = self::registrarLibPath('KycCron.php');
                         if (is_readable($cronFile)) {
-                            require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/CronStateStore.php';
-                            require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/CapsuleCronStore.php';
-                            require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/CronGuard.php';
+                            require_once self::registrarLibPath('CronStateStore.php');
+                            require_once self::registrarLibPath('CapsuleCronStore.php');
+                            require_once self::registrarLibPath('CronGuard.php');
                             require_once $cronFile;
                         }
                     }
@@ -565,12 +575,12 @@ class Controller
                 $apiKey = isset($creds['APIKey']) ? (string) $creds['APIKey'] : '';
 
                 if (!class_exists('\\WHMCS\\Module\\Registrar\\ConnectReseller\\Nameservers')) {
-                    $nsFile = dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Nameservers.php';
+                    $nsFile = self::registrarLibPath('Nameservers.php');
                     if (is_readable($nsFile)) {
-                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/ApiClient.php';
-                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Helper.php';
-                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/DomainMapper.php';
-                        require_once dirname(__DIR__, 3) . '/registrars/connectreseller/lib/Sensitive.php';
+                        require_once self::registrarLibPath('ApiClient.php');
+                        require_once self::registrarLibPath('Helper.php');
+                        require_once self::registrarLibPath('DomainMapper.php');
+                        require_once self::registrarLibPath('Sensitive.php');
                         require_once $nsFile;
                     }
                 }
