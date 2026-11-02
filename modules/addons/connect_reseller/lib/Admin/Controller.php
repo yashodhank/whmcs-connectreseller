@@ -14,7 +14,7 @@ use Smarty;
 
 class Controller
 {
-    private const MODULE_VERSION = '3.0.6';
+    private const MODULE_VERSION = '3.0.7';
 
     public $params = [];
     public $tplDIR;

@@ -1,7 +1,7 @@
 # ConnectReseller for WHMCS
 
 Community-maintained fork of ConnectReseller’s free open-source WHMCS registrar
-plugin **2.5.1**. Current fork release identity: **3.0.6**.
+plugin **2.5.1**. Current fork release identity: **3.0.7**.
 
 This is a drop-in replacement: keep the registrar directory name
 `connectreseller` so existing `tblregistrars` rows and production installs
@@ -14,7 +14,7 @@ GitHub Releases under the MIT license.
 
 | Field | Value |
 |-------|--------|
-| Module version | `3.0.6` |
+| Module version | `3.0.7` |
 | WHMCS registrar `APIVersion` | `1.1` (function contract; **not** the module version) |
 | PHP | **7.4–8.3** (WHMCS 8.x and 9.x) |
 | Language ceiling in shipped code | PHP **7.4** only |
@@ -36,6 +36,18 @@ GitHub Releases under the MIT license.
 - PHP extensions: `curl`, `json`, `mbstring`
 - A ConnectReseller reseller account and API key
 - WHMCS server IP whitelisted in the ConnectReseller panel
+
+## PHP engine advisories
+
+[GHSA-w8hw-w9fx-j79w](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w)
+(CVE-2026-109618) and
+[GHSA-6wmf-4rv5-p3rp](https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp)
+(CVE-2026-109619) are PHP engine bugs. This module does not close them. PHP 7.4
+and 8.1 stay syntax-supported and are officially unpatched. Hosts on the 8.2 or
+8.3 line need PHP 8.2.35 or 8.3.36. The 32 MiB cap is a worker bound on the
+registrar HTTP client, not a fix for GHSA-w8hw-w9fx-j79w.
+Production notes are in [docs/production-deploy.md](docs/production-deploy.md).
+This change is not a deploy.
 
 ## Installation
 
@@ -121,8 +133,10 @@ Shipped PHP must remain valid on **7.4**: no union types, `match`, constructor
 property promotion, named arguments, nullsafe operator, enums, `str_contains`,
 or `str_starts_with`. Typed properties and arrow functions are allowed.
 
-CI runs PHP 7.4, 8.1, 8.2, and 8.3. Live API integration tests are opt-in via
-`CONNECTRESELLER_API_KEY` and must never log that secret.
+CI keeps PHP 7.4 and 8.1 as compatibility jobs. The PHP 8.2 and 8.3 jobs
+install 8.2.35 and 8.3.36 and keep the existing check names. Live API
+integration tests are opt-in via `CONNECTRESELLER_API_KEY` and must never log
+that secret.
 
 ## Cron
 

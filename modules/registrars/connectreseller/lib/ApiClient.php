@@ -8,6 +8,12 @@ if (!defined("WHMCS")) {
 
 class ApiClient
 {
+    /**
+     * Worker bound for one ConnectReseller HTTP response.
+     * Not a measured catalog size.
+     */
+    public const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+
     /** @var string */
     private $baseUrl = 'https://api.connectreseller.com/ConnectReseller/ESHOP/';
 
@@ -172,7 +178,6 @@ class ApiClient
         }
 
         curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
@@ -181,15 +186,60 @@ class ApiClient
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($curl, CURLOPT_TIMEOUT, 30);
 
-        $response = curl_exec($curl);
-        if (curl_errno($curl)) {
-            $error = curl_error($curl);
-            curl_close($curl);
-            throw new \Exception($error);
-        }
-        $this->lastHttpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
+        $buffer = '';
+        $limitError = null;
+        curl_setopt(
+            $curl,
+            CURLOPT_WRITEFUNCTION,
+            static function ($handle, $chunk) use (&$buffer, &$limitError) {
+                if ($limitError instanceof \Exception) {
+                    return 0;
+                }
+                try {
+                    return self::acceptResponseChunk($buffer, $chunk);
+                } catch (\Exception $exception) {
+                    $limitError = $exception;
 
-        return is_string($response) ? $response : '';
+                    return 0;
+                }
+            }
+        );
+
+        try {
+            $ok = curl_exec($curl);
+            if ($limitError instanceof \Exception) {
+                throw $limitError;
+            }
+            if ($ok === false || curl_errno($curl)) {
+                throw new \Exception(curl_error($curl));
+            }
+            $this->lastHttpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        } finally {
+            curl_close($curl);
+        }
+
+        return $buffer;
+    }
+
+    /**
+     * Append one curl write-callback chunk, or throw once the running total
+     * would exceed the worker bound. The rejected chunk is not stored.
+     *
+     * @param string $buffer
+     * @param string $chunk
+     * @return int bytes accepted, for the curl write-callback contract
+     */
+    public static function acceptResponseChunk(&$buffer, $chunk)
+    {
+        $chunk = (string) $chunk;
+        $current = strlen((string) $buffer);
+        $incoming = strlen($chunk);
+        $maxBytes = self::MAX_RESPONSE_BYTES;
+        if ($current > $maxBytes || $incoming > ($maxBytes - $current)) {
+            throw new \Exception('ConnectReseller response exceeded 32 MiB');
+        }
+        $buffer .= $chunk;
+
+        return $incoming;
     }
 }

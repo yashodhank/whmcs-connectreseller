@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.7] - 2026-10-25
+
+The registrar HTTP client now stops at a 32 MiB worker bound, and the PHP 8.2
+and 8.3 CI jobs install 8.2.35 and 8.3.36. This does not close the PHP engine
+bugs disclosed on 2026-10-21.
+
+### Changed
+
+- `ApiClient` stops reading a ConnectReseller response once it exceeds 32 MiB
+  and throws. Existing callers already surface or log that exception. The cap
+  is a worker bound, not a measured catalog size, and it is not a fix for
+  GHSA-w8hw-w9fx-j79w.
+- CI and the release workflow install PHP 8.2.35 and 8.3.36 for the existing
+  PHP 8.2 and 8.3 jobs. PHP 7.4 and 8.1 stay compatibility jobs. Check names
+  are unchanged.
+- Module / addon version is **3.0.7**.
+
+[3.0.7]: https://github.com/yashodhank/whmcs-connectreseller/compare/v3.0.6...main
+
 ## [3.0.6] - 2026-10-07
 
 Optional ConnectReseller ESHOP API capabilities that neither the vendor zip nor
