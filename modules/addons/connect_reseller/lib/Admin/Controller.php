@@ -17,6 +17,22 @@ class Controller
     private const MODULE_VERSION = '3.0.8';
 
     /**
+     * WHMCS's $templates_compiledir may be relative to the WHMCS root; Smarty would resolve it
+     * against the admin cwd. Returns an absolute writable directory, or '' to keep Smarty's default.
+     */
+    public static function resolveCompileDir($configured, string $rootDir): string
+    {
+        $dir = trim((string) $configured);
+        if ($dir === '') {
+            return '';
+        }
+        if ($dir[0] !== '/' && !preg_match('#^[A-Za-z]:[\\\\/]#', $dir)) {
+            $dir = rtrim($rootDir, '/\\') . '/' . $dir;
+        }
+        return (is_dir($dir) && is_writable($dir)) ? $dir : '';
+    }
+
+    /**
      * Absolute path of a registrar lib file. This class lives in
      * modules/addons/connect_reseller/lib/Admin, so the modules directory is
      * four levels up (3 resolves to modules/addons, which is wrong).
@@ -635,8 +651,9 @@ class Controller
         $this->smarty = new Smarty();
         $this->smarty->caching = false;
         // Default ./templates_c/ resolves under the root-owned docroot (admin cwd); www-data cannot write there.
-        if (!empty($templates_compiledir)) {
-            $this->smarty->setCompileDir($templates_compiledir);
+        $compileDir = self::resolveCompileDir($templates_compiledir ?? '', ROOTDIR);
+        if ($compileDir !== '') {
+            $this->smarty->setCompileDir($compileDir);
         }
         if (empty($this->tplFileName)) {
             $this->tplFileName = 'error';
