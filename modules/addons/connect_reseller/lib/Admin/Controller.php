@@ -53,7 +53,7 @@ class Controller
         $this->tplVar['enabledisableLink'] = $this->buildActionLink($moduleBaseLink, 'enabledisable');
         $this->tplVar['bulknsLink'] = $this->buildActionLink($moduleBaseLink, 'bulkns');
         $this->tplVar['module'] = $params['module'];
-        $this->tplVar['tplDIR'] = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/";
+        $this->tplVar['tplDIR'] = $this->tplDIR = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/";
         $this->tplVar['header'] = ROOTDIR . "/modules/addons/{$params['module']}/templates/admin/header.tpl";
         $this->tplVar['cssPath'] = $CONFIG["SystemURL"] . "/modules/addons/{$params['module']}/assets/css/";
         $this->tplVar['scriptPath'] = $CONFIG["SystemURL"] . "/modules/addons/{$params['module']}/assets/js/";
@@ -381,6 +381,8 @@ class Controller
                 $this->emitJsonResponse(false, $e->getMessage());
             }
             $this->tplVar['error'] = $e->getMessage();
+            $this->tplFileName = 'error';
+            $this->output();
         }
     }
 
@@ -540,6 +542,8 @@ class Controller
                 $this->emitJsonResponse(false, $e->getMessage());
             }
             $this->tplVar['error'] = $e->getMessage();
+            $this->tplFileName = 'error';
+            $this->output();
         }
     }
 
@@ -626,18 +630,24 @@ class Controller
 
     public function output($data = null)
     {
+        global $templates_compiledir;
+        $this->tplVar['data'] = $data;
+        $this->smarty = new Smarty();
+        $this->smarty->caching = false;
+        // Default ./templates_c/ resolves under the root-owned docroot (admin cwd); www-data cannot write there.
+        if (!empty($templates_compiledir)) {
+            $this->smarty->setCompileDir($templates_compiledir);
+        }
+        if (empty($this->tplFileName)) {
+            $this->tplFileName = 'error';
+            $this->tplVar['error'] = 'not found';
+        }
         try {
-            $this->tplVar['data'] = $data;
-            $this->smarty = new Smarty();
             $this->smarty->assign('tplVar', $this->tplVar);
-            if (!empty($this->tplFileName)) {
-                $this->smarty->display($this->tplVar['tplDIR'] . $this->tplFileName . '.tpl');
-            } else {
-                $this->tplVar['errorMsg'] = 'not found';
-                $this->smarty->display($this->tplDIR . 'error.tpl');
-            }
+            $this->smarty->display($this->tplDIR . $this->tplFileName . '.tpl');
         } catch (\Exception $e) {
             $this->tplVar['error'] = $e->getMessage();
+            $this->smarty->assign('tplVar', $this->tplVar);
             $this->smarty->display($this->tplDIR . 'error.tpl');
         }
     }
