@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.9] - 2026-11-23
+
+Folds the two prod overlay patches that ran on top of 3.0.8, so the overlay can
+point at a real source commit again, and fixes the KYC gate's client lookup.
+
+### Fixed
+
+- Admin `Controller` (prod #127): `tplDIR` was declared but never set, so error
+  fallbacks displayed a relative `error.tpl`; enabledisable and domainsync
+  errors now render the error page instead of a blank one; Smarty compiles into
+  WHMCS's `$templates_compiledir` (resolved against ROOTDIR when relative, used
+  only when writable) instead of `./templates_c` under the admin cwd.
+- Registrar hooks (prod #111): `PreRegistrarRegisterDomain` only gates domains
+  whose registrar is `connectreseller`. WHMCS loads every active registrar's
+  `hooks.php`, so `.in` domains on other registrars were blocked and queued.
+  The checkout KYC notice only looks at this order's ConnectReseller domains.
+- The KYC gate read `$vars['params']['client_id']`; it now takes the client
+  from the domain row. If that key was absent the gate never fired.
+
+### Changed
+
+- Module / addon version is **3.0.9**.
+- `docs/production-deploy.md` no longer names production hosts or containers.
+
+[3.0.9]: https://github.com/yashodhank/whmcs-connectreseller/compare/e758336...main
+
 ## [3.0.8] - 2026-11-02
 
 The addon admin `Controller` resolved the registrar lib directory one level too
@@ -24,7 +50,7 @@ code as unavailable.
 
 - Module / addon version is **3.0.8**.
 
-[3.0.8]: https://github.com/yashodhank/whmcs-connectreseller/compare/v3.0.7...main
+[3.0.8]: https://github.com/yashodhank/whmcs-connectreseller/compare/v3.0.7...e758336
 
 ## [3.0.7] - 2026-10-25
 

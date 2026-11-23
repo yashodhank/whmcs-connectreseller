@@ -189,10 +189,23 @@ add_hook("ClientAdd", 1, function($vars)
 */ 
 add_hook('PreRegistrarRegisterDomain', 1, function($vars) {
     try {
+        // WHMCS loads every active registrar's hooks.php globally: only gate
+        // domains that are actually registered through ConnectReseller.
+        if (!isset($vars['params']['domainid'])
+            || !connectreseller_domainUsesRegistrar($vars['params']['domainid'])) {
+            return;
+        }
+
         connectreseller_ensureKycSchema();
 
         if(isset($vars['params'])) {
-            $user = Capsule::table('tblclients')->where('id', (int) $vars['params']['client_id'])->first();
+            // The domain row is authoritative for the owner; registrar params may not carry 'client_id'.
+            $clientId = (int) Capsule::table('tbldomains')->where('id', (int) $vars['params']['domainid'])->value('userid');
+            $user = $clientId > 0 ? Capsule::table('tblclients')->where('id', $clientId)->first() : null;
+            if (!$user) {
+                logActivity("ConnectReseller KYC gate: no client for domain id " . (int) $vars['params']['domainid']);
+                return;
+            }
 
             $hasInTLD = DomainMapper::isInDomain($vars['params']['domainname']);
 
@@ -342,7 +355,9 @@ add_hook('AdminAreaClientSummaryPage', 1, function($vars) {
 // show verification msg
 add_hook('ShoppingCartCheckoutCompletePage', 1, function($vars) {
     if(isset($vars['orderid']) && !empty($vars['orderid'])) {
-        $domains = Capsule::table("tbldomains")->where("orderid", $vars['orderid'])->get();
+        // Only this order's ConnectReseller domains need the KYC warning.
+        $domains = Capsule::table("tbldomains")->where("orderid", $vars['orderid'])
+            ->where("registrar", "connectreseller")->get();
 
         $domains_data = [];
 
@@ -378,6 +393,20 @@ add_hook('ShoppingCartCheckoutCompletePage', 1, function($vars) {
 
 
 /** ******************************************************* FUNCTIONS ******************************************************* */
+
+if (!function_exists('connectreseller_domainUsesRegistrar')) {
+    /**
+     * Whether a tbldomains row is registered through the ConnectReseller registrar.
+     */
+    function connectreseller_domainUsesRegistrar($domainId)
+    {
+        if ((int) $domainId <= 0) {
+            return false;
+        }
+        $registrar = Capsule::table('tbldomains')->where('id', (int) $domainId)->value('registrar');
+        return strtolower((string) $registrar) === 'connectreseller';
+    }
+}
 
 /**
  * View Reseller client
