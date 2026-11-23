@@ -31,7 +31,8 @@ final class CompileDirResolutionTest extends TestCase
 
     public function testAbsoluteWritableIsKept(): void
     {
-        self::assertSame($this->root . '/templates_c', Controller::resolveCompileDir($this->root . '/templates_c', '/nowhere'));
+        $abs = $this->root . '/templates_c';
+        self::assertSame($abs, Controller::resolveCompileDir($abs, '/nowhere'));
     }
 
     public function testMissingDirFallsBack(): void
@@ -42,7 +43,9 @@ final class CompileDirResolutionTest extends TestCase
 
     public function testOutputUsesResolver(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/Admin/Controller.php');
+        $src = (string) file_get_contents(
+            dirname(__DIR__, 2) . '/modules/addons/connect_reseller/lib/Admin/Controller.php'
+        );
         self::assertStringContainsString('self::resolveCompileDir($templates_compiledir ?? \'\', ROOTDIR)', $src);
     }
 }

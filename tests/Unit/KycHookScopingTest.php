@@ -29,7 +29,10 @@ final class KycHookScopingTest extends TestCase
     public function testDomainUsesRegistrarHelper(): void
     {
         $r = self::runHarness(array(
-            'domains' => array(5 => array('registrar' => 'ConnectReseller'), 6 => array('registrar' => 'resellerclubrcm')),
+            'domains' => array(
+                5 => array('registrar' => 'ConnectReseller'),
+                6 => array('registrar' => 'resellerclubrcm'),
+            ),
             'hook' => 'none',
             'vars' => array(),
             'probe' => array(5, 6, 0, -1, null, 999),
@@ -43,11 +46,13 @@ final class KycHookScopingTest extends TestCase
             'domains' => array(6 => array('registrar' => 'resellerclubrcm', 'userid' => 9)),
             'clients' => array(9 => array('country' => 'IN', 'email' => 'x@example.invalid')),
             'hook' => 'PreRegistrarRegisterDomain',
-            'vars' => array('params' => array('domainid' => 6, 'domainname' => 'example.in', 'userid' => 9, 'client_id' => 9)),
+            'vars' => array('params' => array(
+                'domainid' => 6, 'domainname' => 'example.in', 'userid' => 9, 'client_id' => 9,
+            )),
         ));
         self::assertNull($r['return']);
         foreach ($r['log'] as $entry) {
-            self::assertStringStartsWith('tbldomains:', $entry, 'no schema, client lookup or insert for a non-CR domain');
+            self::assertStringStartsWith('tbldomains:', $entry, 'no schema, client or insert for a non-CR domain');
         }
     }
 
@@ -68,7 +73,9 @@ final class KycHookScopingTest extends TestCase
             'domains' => array(5 => array('registrar' => 'connectreseller', 'userid' => 42)),
             'clients' => array(42 => array('country' => 'US', 'email' => 'x@example.invalid')),
             'hook' => 'PreRegistrarRegisterDomain',
-            'vars' => array('params' => array('domainid' => 5, 'domainname' => 'example.in', 'sld' => 'example', 'tld' => 'in')),
+            'vars' => array('params' => array(
+                'domainid' => 5, 'domainname' => 'example.in', 'sld' => 'example', 'tld' => 'in',
+            )),
         ));
         self::assertNull($r['return']);
         self::assertContains('tblclients:[["id","=",42]]', $r['log']);
