@@ -14,7 +14,7 @@ use Smarty;
 
 class Controller
 {
-    private const MODULE_VERSION = '3.0.8';
+    private const MODULE_VERSION = '3.0.9';
 
     /**
      * WHMCS's $templates_compiledir may be relative to the WHMCS root; Smarty would resolve it
