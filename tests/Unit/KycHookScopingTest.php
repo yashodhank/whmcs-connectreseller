@@ -61,6 +61,19 @@ final class KycHookScopingTest extends TestCase
         self::assertSame(array(), $r['log']);
     }
 
+    /** WHMCS registrar params carry the client as userid; the client is resolved from the domain row either way. */
+    public function testClientResolvedFromDomainRowWhenClientIdParamAbsent(): void
+    {
+        $r = self::runHarness(array(
+            'domains' => array(5 => array('registrar' => 'connectreseller', 'userid' => 42)),
+            'clients' => array(42 => array('country' => 'US', 'email' => 'x@example.invalid')),
+            'hook' => 'PreRegistrarRegisterDomain',
+            'vars' => array('params' => array('domainid' => 5, 'domainname' => 'example.in', 'sld' => 'example', 'tld' => 'in')),
+        ));
+        self::assertNull($r['return']);
+        self::assertContains('tblclients:[["id","=",42]]', $r['log']);
+    }
+
     public function testCheckoutNoticeOnlyLooksAtConnectResellerDomains(): void
     {
         $r = self::runHarness(array(

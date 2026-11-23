@@ -199,7 +199,13 @@ add_hook('PreRegistrarRegisterDomain', 1, function($vars) {
         connectreseller_ensureKycSchema();
 
         if(isset($vars['params'])) {
-            $user = Capsule::table('tblclients')->where('id', (int) $vars['params']['client_id'])->first();
+            // The domain row is authoritative for the owner; registrar params may not carry 'client_id'.
+            $clientId = (int) Capsule::table('tbldomains')->where('id', (int) $vars['params']['domainid'])->value('userid');
+            $user = $clientId > 0 ? Capsule::table('tblclients')->where('id', $clientId)->first() : null;
+            if (!$user) {
+                logActivity("ConnectReseller KYC gate: no client for domain id " . (int) $vars['params']['domainid']);
+                return;
+            }
 
             $hasInTLD = DomainMapper::isInDomain($vars['params']['domainname']);
 
